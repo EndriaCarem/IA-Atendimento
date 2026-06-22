@@ -1,0 +1,27 @@
+# Dependências
+node_modules/
+
+# Variáveis de ambiente e segredos
+.env
+.env.local
+.env.production
+.env.evolution
+*.pem
+
+# Banco de dados local (json-db) — contém dados reais, nunca versionar
+data/
+
+# Frontend (vive em repositório próprio — IACLIN)
+frontend/
+
+# Logs e artefatos
+npm-debug.log*
+coverage/
+*.log
+
+# Ferramentas e notas locais de desenvolvimento
+.claude/
+memory/
+
+# Sistema
+.DS_Store

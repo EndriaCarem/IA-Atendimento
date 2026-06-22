@@ -1,0 +1,31 @@
+version: '3.9'
+services:
+  postgres-evolution:
+    container_name: postgres_evolution_ia
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution123
+      POSTGRES_DB: evolution
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata_evolution:/var/lib/postgresql/data
+
+  evolution-api-ia-atendimento:
+    container_name: evolution_api_ia_atendimento
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres-evolution
+    env_file:
+      - .env.evolution
+    volumes:
+      - evolution_instances:/evolution/instances
+
+volumes:
+  evolution_instances:
+  pgdata_evolution:
