@@ -178,7 +178,8 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
       appointmentId: current.id,
       clinicId,
       status: "cancelled",
-      notes
+      notes,
+      cancelledBy: "patient", // cancelado pelo paciente via IA (WhatsApp)
     });
 
     return {

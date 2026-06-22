@@ -57,7 +57,7 @@ export async function findMostRecentAppointmentByPatient(clinicId, patientId) {
   return mapAppointment(records[0]);
 }
 
-export async function updateAppointmentById({ appointmentId, clinicId, scheduledAt, status, notes }) {
+export async function updateAppointmentById({ appointmentId, clinicId, scheduledAt, status, notes, cancelledBy = null }) {
   const updates = {
     [env.COL_APPOINTMENT_STATUS]: status,
     sync_status: "pending",
@@ -69,6 +69,13 @@ export async function updateAppointmentById({ appointmentId, clinicId, scheduled
 
   if (typeof notes === "string") {
     updates[env.COL_APPOINTMENT_NOTES] = notes;
+  }
+
+  // Quem cancelou (ex: "patient" quando o paciente cancela pela IA). Permite o
+  // front mostrar "Cancelada pelo paciente" em vez de só esconder a consulta.
+  if (cancelledBy) {
+    updates.cancelled_by = cancelledBy;
+    updates.cancelled_at = new Date().toISOString();
   }
 
   const record = dbUpdate(
