@@ -31,11 +31,29 @@ export async function initiateWhatsAppOnboarding({ clinicId, webhookUrl, clinicP
     logger.info({ clinicId, instanceName: existing.instanceName }, "Reusing existing instance");
 
     let state = "unknown";
+    let instanceMissing = false;
     try {
       const stateResult = await getEvolutionConnectionState(existing.instanceName);
       state = stateResult?.instance?.state ?? "unknown";
     } catch (err) {
-      logger.warn({ err }, "Could not fetch connection state, will generate QR anyway");
+      // 404 = a instância não existe mais na Evolution (foi deletada/limpa).
+      // Nesse caso NÃO adianta tentar reconectar — precisa recriar do zero.
+      if (err?.statusCode === 404 || err?.details?.evolution_status === 404) {
+        instanceMissing = true;
+        logger.warn({ clinicId, instanceName: existing.instanceName }, "Instância não existe mais na Evolution — recriando do zero");
+      } else {
+        logger.warn({ err }, "Could not fetch connection state, will generate QR anyway");
+      }
+    }
+
+    // Instância sumiu da Evolution: recria (cria + webhook + QR) reaproveitando o nome.
+    if (instanceMissing) {
+      return createAndRegisterInstance({
+        clinicId,
+        webhookUrl,
+        clinicPhoneNumber,
+        instanceName: existing.instanceName,
+      });
     }
 
     // O state mente: "open" mesmo após desconexão pelo celular. Só consideramos
@@ -79,12 +97,18 @@ export async function initiateWhatsAppOnboarding({ clinicId, webhookUrl, clinicP
   }
 
   // -- Sem instância prévia: cria uma nova --
+  return createAndRegisterInstance({ clinicId, webhookUrl, clinicPhoneNumber });
+}
+
+// Cria a instância na Evolution (+ webhook + QR) e salva o mapping.
+// Reusa o instanceName quando informado (recriação); senão gera um novo.
+async function createAndRegisterInstance({ clinicId, webhookUrl, clinicPhoneNumber = null, instanceName: reuseName = null }) {
   let instanceName;
   let createdInEvolution = false;
   let qrCodeData = null;
 
   try {
-    instanceName = generateInstanceName(clinicId);
+    instanceName = reuseName ?? generateInstanceName(clinicId);
     logger.info({ clinicId, instanceName }, "Starting WhatsApp onboarding");
 
     await createEvolutionInstance({
