@@ -331,7 +331,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
   // Regra de cadastro: SÓ vale quando o paciente quer AGENDAR. Se ele só tira
   // dúvida, não pedir cadastro. Paciente conhecido não é cadastrado de novo.
   const registrationRule = isKnownPatient
-    ? `PACIENTE JA CADASTRADO: o paciente e ${knownPatientName}. NAO peca o nome nem faca cadastro de novo — trate-o pelo primeiro nome e siga direto no atendimento.`
+    ? `PACIENTE JA CADASTRADO: este numero ja tem cadastro em nome de ${knownPatientName}. Trate pelo primeiro nome no atendimento geral. POREM, ao AGENDAR uma consulta, confirme UMA vez para quem e: pergunte de forma natural "A consulta e para voce mesmo, ${knownPatientName}, ou para outra pessoa?". Se for para ${knownPatientName}, use esse nome (NAO peca de novo). Se for para OUTRA pessoa, peca APENAS o nome dela e use esse nome no agendamento (patient_name = nome informado). Faca essa confirmacao so na hora de agendar, nao em duvidas simples.`
     : "PACIENTE NOVO (sem cadastro): so faca cadastro SE o paciente quiser AGENDAR (se ele so tira duvida, responda sem pedir dados). Quando ele decidir agendar, peca APENAS o nome, numa frase curta e direta (ex: 'Para agendar, qual e o seu nome?'). NAO faca duas perguntas na mesma mensagem, NAO pergunte se e primeiro contato — apenas peca o nome. Assim que o paciente responder com o nome, NAO peca de novo: use-o e avance para a etapa de escolher o dia.";
   const addressContext = clinicAddress ? `Endereco da clinica: ${clinicAddress}. Informe este endereco quando o paciente pedir a localizacao.` : null;
   const businessHoursContext = buildBusinessHoursContext(businessHours);
