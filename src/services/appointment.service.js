@@ -5,7 +5,19 @@ import {
 } from "../repositories/appointment.repository.js";
 import { createProvisionalPatient } from "../repositories/patient.repository.js";
 import { findClinicById } from "../repositories/clinic.repository.js";
+import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
+
+// Fuso da clínica para interpretar os horários que a IA gera. Usa o campo da
+// clínica se existir; senão cai no DEFAULT_TIMEZONE.
+async function resolveClinicTimezone(clinicId) {
+  try {
+    const clinic = await findClinicById(clinicId);
+    return clinic?.timezone || clinic?.time_zone || env.DEFAULT_TIMEZONE;
+  } catch {
+    return env.DEFAULT_TIMEZONE;
+  }
+}
 
 // Normaliza nome de procedimento para comparar (sem acento, minúsculo).
 function norm(s) {
@@ -35,18 +47,49 @@ async function resolveDentistForProcedure(clinicId, procedure) {
   }
 }
 
-function toIsoDate(value) {
+// Calcula o offset (em minutos) de um timezone IANA numa data específica,
+// considerando horário de verão. Ex: America/Manaus → -240 (UTC-4).
+function tzOffsetMinutes(date, timeZone) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  });
+  const parts = Object.fromEntries(dtf.formatToParts(date).map((p) => [p.type, p.value]));
+  const asUTC = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour === "24" ? 0 : parts.hour), Number(parts.minute), Number(parts.second)
+  );
+  return (asUTC - date.getTime()) / 60000;
+}
+
+// Converte o horário da IA para ISO/UTC correto.
+// A IA emite um horário "naive" (ex: "2026-06-23T10:00:00") que representa a
+// hora LOCAL DA CLÍNICA. Sem fuso, o servidor (UTC) interpretava como UTC e
+// perdia o offset (10h Manaus virava 06h). Aqui aplicamos o timezone informado.
+function toIsoDate(value, timeZone = null) {
   if (!value || typeof value !== "string") {
     return null;
   }
 
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
+  // Se já vem com fuso explícito (Z ou ±hh:mm), respeita como está.
+  const hasTz = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(value.trim());
+  if (hasTz || !timeZone) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
   }
 
-  return parsed.toISOString();
+  // Horário "naive" (sem fuso): extrai os componentes e monta como se fosse UTC,
+  // depois corrige pelo offset real do timezone da clínica naquela data.
+  const m = value.replace(" ", "T").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s = "0"] = m;
+  // Trata os componentes como UTC primeiro (ponto de partida).
+  const asIfUtc = Date.UTC(+y, +mo - 1, +d, +h, +mi, +s);
+  // offset do timezone naquela data (ex: Manaus = -240 min).
+  const offsetMin = tzOffsetMinutes(new Date(asIfUtc), timeZone);
+  // O horário local da clínica em UTC = asIfUtc - offset.
+  return new Date(asIfUtc - offsetMin * 60000).toISOString();
 }
 
 export async function applyAppointmentAction({ clinicId, patient, phone, aiResult }) {
@@ -88,9 +131,10 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
   patient = effectivePatient;
 
   const notes = action.notes ?? null;
+  const clinicTz = await resolveClinicTimezone(clinicId);
 
   if (action.action_type === "create") {
-    const scheduledAt = toIsoDate(action.appointment_datetime);
+    const scheduledAt = toIsoDate(action.appointment_datetime, clinicTz);
 
     if (!scheduledAt) {
       return {
@@ -122,7 +166,7 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
   }
 
   if (action.action_type === "update") {
-    const scheduledAt = toIsoDate(action.appointment_datetime);
+    const scheduledAt = toIsoDate(action.appointment_datetime, clinicTz);
 
     if (!scheduledAt) {
       return {
