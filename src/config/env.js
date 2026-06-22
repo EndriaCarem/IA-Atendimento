@@ -52,6 +52,9 @@ const envSchema = z
     GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
 
     GROQ_API_KEY: optionalNonEmptyString,
+    // Chaves Groq adicionais (contas diferentes) separadas por vírgula. Quando a
+    // chave principal estoura o rate limit (429), o backend tenta as próximas.
+    GROQ_API_KEYS: optionalNonEmptyString,
     GROQ_MODEL: z.string().default("llama-3.3-70b-versatile"),
 
     OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
