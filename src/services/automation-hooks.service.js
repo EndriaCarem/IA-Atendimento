@@ -48,7 +48,11 @@ export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt 
       // intencionalmente sem ação — ver comentário acima.
     }
 
-    if (newStatus === "cancelled" || newStatus === "canceled") {
+    // Aviso de cancelamento/reagendamento: SÓ quando a CLÍNICA cancela. Se foi o
+    // PRÓPRIO paciente que cancelou pela IA, ele já recebeu "Consulta cancelada
+    // com sucesso" na conversa — disparar de novo aqui seria mensagem duplicada.
+    const cancelledByPatient = apt.cancelled_by === "patient";
+    if ((newStatus === "cancelled" || newStatus === "canceled") && !cancelledByPatient) {
       const automation = getActiveAutomation(clinicId, "reschedule");
       if (automation) {
         await dispatchAutomationMessage({
