@@ -39,18 +39,13 @@ export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt 
   };
 
   try {
+    // CONFIRMAÇÃO ao aprovar: NÃO disparada aqui. Quem avisa o paciente é a edge
+    // function do Lovable (approve-ai-appointment-request), que manda a mensagem
+    // com data/hora ("CONFIRMADA para DD/MM HH:mm"). Disparar também aqui gerava
+    // mensagem DUPLICADA. Mantido desativado mesmo que o toggle do painel religue
+    // a automation 'confirmation' via sync.
     if (newStatus === "confirmed") {
-      const automation = getActiveAutomation(clinicId, "confirmation");
-      if (automation) {
-        await dispatchAutomationMessage({
-          clinicId,
-          type: "confirmation",
-          dedupeKey: `confirmation:${apt.id}`,
-          template: automation.message_template,
-          phone: apt.patient_phone,
-          context,
-        });
-      }
+      // intencionalmente sem ação — ver comentário acima.
     }
 
     if (newStatus === "cancelled" || newStatus === "canceled") {
