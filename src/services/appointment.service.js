@@ -114,10 +114,16 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
       const nameFromAction = typeof action.patient_name === "string" && action.patient_name.trim()
         ? action.patient_name.trim()
         : (typeof action.notes === "string" && action.notes.length < 60 ? action.notes : null);
+      // Normaliza a data de nascimento que a IA extraiu (aceita só YYYY-MM-DD).
+      const dob = typeof action.date_of_birth === "string"
+        && /^\d{4}-\d{2}-\d{2}$/.test(action.date_of_birth.trim())
+        ? action.date_of_birth.trim()
+        : null;
       effectivePatient = await createProvisionalPatient({
         clinicId,
         phone,
         name: nameFromAction,
+        dateOfBirth: dob,
       });
       logger.info({ clinicId, phone, patientId: effectivePatient?.id }, "[APPOINTMENT] Paciente provisório criado pela IA");
     }

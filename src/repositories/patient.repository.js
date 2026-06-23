@@ -40,7 +40,7 @@ export async function findPatientByClinicAndPhone(clinicId, rawPhone) {
  * para alguém que ainda não está cadastrado. Marcado com source="ai" e
  * sync_status="pending" para o Lovable criar o paciente real no Supabase depois.
  */
-export async function createProvisionalPatient({ clinicId, phone, name }) {
+export async function createProvisionalPatient({ clinicId, phone, name, dateOfBirth = null }) {
   if (!clinicId || !phone) return null;
 
   const record = {
@@ -48,6 +48,7 @@ export async function createProvisionalPatient({ clinicId, phone, name }) {
     [env.COL_PATIENT_CLINIC_ID]: clinicId,
     [env.COL_PATIENT_PHONE]: phone,
     full_name: name ?? null,
+    date_of_birth: dateOfBirth ?? null, // coletado pela IA → habilita aniversário
     source: "ai",
     sync_status: "pending",
     provisional: true,
@@ -61,5 +62,6 @@ export async function createProvisionalPatient({ clinicId, phone, name }) {
     clinicId: data[env.COL_PATIENT_CLINIC_ID],
     name: data.full_name ?? null,
     phone: data[env.COL_PATIENT_PHONE] ?? null,
+    dateOfBirth: data.date_of_birth ?? null,
   };
 }
