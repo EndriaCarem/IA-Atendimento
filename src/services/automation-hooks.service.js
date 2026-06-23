@@ -8,7 +8,24 @@
 
 import { dbFind } from "../lib/json-db.js";
 import { dispatchAutomationMessage } from "./automation-sender.service.js";
+import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
+
+// Monta "consulta de <procedimento> de <dia-da-semana DD/MM> às <HH:mm>" com o
+// fuso da clínica, para a mensagem de cancelamento ser específica.
+function buildCancelDetail(apt) {
+  const tz = env.DEFAULT_TIMEZONE;
+  const proc = apt.procedure ? `consulta de ${apt.procedure}` : "consulta";
+  if (!apt.start_time) return proc;
+  try {
+    const d = new Date(apt.start_time);
+    const data = new Intl.DateTimeFormat("pt-BR", { timeZone: tz, weekday: "long", day: "2-digit", month: "2-digit" }).format(d);
+    const hora = new Intl.DateTimeFormat("pt-BR", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(d);
+    return `${proc} de ${data} às ${hora}`;
+  } catch {
+    return proc;
+  }
+}
 
 function getActiveAutomation(clinicId, type) {
   const found = dbFind(
@@ -55,12 +72,19 @@ export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt 
     if ((newStatus === "cancelled" || newStatus === "canceled") && !cancelledByPatient) {
       const automation = getActiveAutomation(clinicId, "reschedule");
       if (automation) {
+        // Mensagem montada pelo backend COM os detalhes da consulta (data/hora/
+        // procedimento), para o paciente saber exatamente o que foi cancelado.
+        // Usa as variáveis renderizadas pelo dispatch — não depende do dono.
+        const detalhe = buildCancelDetail(apt);
+        const template = detalhe
+          ? `Olá {patient_name}! Infelizmente precisamos cancelar sua ${detalhe}. Pedimos desculpas pelo transtorno. 🙏 Se quiser, me diga que te ajudo a reagendar para uma nova data.`
+          : automation.message_template;
         await dispatchAutomationMessage({
           clinicId,
           type: "reschedule",
           // dedupe por status+id: se cancelar de novo no futuro, permite reenvio
           dedupeKey: `reschedule:${apt.id}:${apt.start_time ?? ""}`,
-          template: automation.message_template,
+          template,
           phone: apt.patient_phone,
           context,
         });
