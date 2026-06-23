@@ -260,3 +260,11 @@ export async function logoutEvolutionInstance(instanceName) {
     });
   });
 }
+
+// Reinicia a instância — força a Evolution a sair do estado "connecting" ocioso
+// (quando parou de gerar QR após muitas renovações sem scan) e produzir QR novo.
+export async function restartEvolutionInstance(instanceName) {
+  return evolutionApiRequest(`/instance/restart/${encodeURIComponent(instanceName)}`, {
+    method: "POST"
+  });
+}
