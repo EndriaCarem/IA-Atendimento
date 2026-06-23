@@ -2,15 +2,11 @@ import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
 import { initiateWhatsAppOnboarding } from "../services/whatsapp-onboarding.service.js";
 import { getLatestQr } from "../services/qr-store.service.js";
-import { getEvolutionQrCode } from "../lib/evolution-api.js";
+import { getEvolutionQrCode, restartEvolutionInstance } from "../lib/evolution-api.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Busca o QR ativamente da Evolution quando não há um capturado via webhook.
-// A Evolution às vezes leva 1-2s para emitir o primeiro qrcode.updated — sem
-// isso o endpoint retornava qr_code:null e o painel mostrava "não foi possível
-// gerar". Tenta algumas vezes antes de desistir.
-async function fetchQrWithRetry(instanceName, attempts = 3) {
+async function tryGetQr(instanceName, attempts, waitMs) {
   for (let i = 0; i < attempts; i++) {
     try {
       const data = await getEvolutionQrCode(instanceName);
@@ -19,9 +15,26 @@ async function fetchQrWithRetry(instanceName, attempts = 3) {
         return base64;
       }
     } catch { /* tenta de novo */ }
-    await sleep(1500);
+    await sleep(waitMs);
   }
   return null;
+}
+
+// Busca o QR ativamente da Evolution. Se não vier (instância "connecting" ociosa
+// que parou de gerar QR após muitas renovações sem scan), REINICIA a instância
+// para forçar a Evolution a produzir um QR fresco — evita o usuário ficar preso
+// com um QR morto que nunca lê.
+async function fetchQrWithRetry(instanceName) {
+  let qr = await tryGetQr(instanceName, 3, 1500);
+  if (qr) return qr;
+
+  // Fallback: restart força nova sessão/QR.
+  try {
+    await restartEvolutionInstance(instanceName);
+    await sleep(2500);
+  } catch { /* segue para a nova tentativa */ }
+
+  return tryGetQr(instanceName, 4, 1800);
 }
 
 function normalizeQrCode(result) {
