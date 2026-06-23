@@ -14,6 +14,9 @@ const appointmentActionSchema = z.object({
   // Data de nascimento coletada no cadastro (formato YYYY-MM-DD). Usada para a
   // automação de aniversário. Telefone vem automático do WhatsApp.
   date_of_birth: z.string().nullable().optional(),
+  // CPF do paciente (identificador único; só dígitos ou formatado). Usado para
+  // localizar cadastro existente e evitar duplicidade.
+  cpf: z.string().nullable().optional(),
   procedure: z.string().nullable().optional(),
   notes: z.string().nullable().optional()
 });
@@ -335,7 +338,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
   // dúvida, não pedir cadastro. Paciente conhecido não é cadastrado de novo.
   const registrationRule = isKnownPatient
     ? `PACIENTE JA CADASTRADO: este numero ja tem cadastro em nome de ${knownPatientName}. Trate pelo primeiro nome no atendimento geral. POREM, ao AGENDAR uma consulta, confirme UMA vez para quem e: pergunte de forma natural "A consulta e para voce mesmo, ${knownPatientName}, ou para outra pessoa?". Se for para ${knownPatientName}, use esse nome (NAO peca de novo). Se for para OUTRA pessoa, peca APENAS o nome dela e use esse nome no agendamento (patient_name = nome informado). Faca essa confirmacao so na hora de agendar, nao em duvidas simples.`
-    : "PACIENTE NOVO (sem cadastro): so faca cadastro SE o paciente quiser AGENDAR (se ele so tira duvida, responda sem pedir dados). Para cadastrar voce precisa de DOIS dados, perguntados UM POR VEZ (nunca os dois na mesma mensagem): (1) o NOME completo — ex: 'Para agendar, qual e o seu nome?'; (2) DEPOIS que tiver o nome, a DATA DE NASCIMENTO — ex: 'Obrigado! E qual a sua data de nascimento?'. O telefone vem automatico, NAO peca. Quando ja tiver nome E data de nascimento, ao criar o agendamento preencha appointment_action com patient_name e date_of_birth (formato YYYY-MM-DD; converta datas como '15/03/1990' para '1990-03-15'). NAO peca CPF, e-mail nem outros dados. NAO repita uma pergunta ja respondida.";
+    : "PACIENTE NOVO (sem cadastro): so faca cadastro SE o paciente quiser AGENDAR (se ele so tira duvida, responda sem pedir dados). Para cadastrar voce precisa de TRES dados, perguntados UM POR VEZ (nunca dois na mesma mensagem): (1) NOME completo — ex: 'Para agendar, qual e o seu nome?'; (2) DEPOIS do nome, DATA DE NASCIMENTO — ex: 'Obrigado! Qual a sua data de nascimento?'; (3) DEPOIS, o CPF — ex: 'Por fim, qual o seu CPF?'. O telefone vem automatico, NAO peca. Quando tiver os tres, ao criar o agendamento preencha appointment_action com patient_name, date_of_birth (YYYY-MM-DD; converta '15/03/1990' para '1990-03-15') e cpf (so os digitos). NAO peca e-mail. NAO repita pergunta ja respondida.";
   const addressContext = clinicAddress ? `Endereco da clinica: ${clinicAddress}. Informe este endereco quando o paciente pedir a localizacao.` : null;
   const businessHoursContext = buildBusinessHoursContext(businessHours);
   const handoffContext = buildHandoffContext(handoff);
@@ -399,7 +402,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
     "Retorne somente JSON valido, sem markdown e sem texto extra.",
     "IMPORTANTE: o campo reply_to_patient deve ser curto e COMPLETO. Em respostas simples use no maximo 2 frases. Ao LISTAR servicos/procedimentos/convenios, pode usar varias linhas (uma por item, com quebras de linha \\n e bullets •), de forma organizada e legivel no WhatsApp. Nunca corte palavras ou frases no meio.",
     "Formato:",
-    '{"reply_to_patient":"string","intent":"faq|schedule|reschedule|cancel|handoff|unknown","confidence":0.0,"appointment_action":{"should_update":false,"action_type":"none|create|update|cancel","appointment_datetime":null,"patient_name":null,"date_of_birth":null,"procedure":null,"notes":null}}'
+    '{"reply_to_patient":"string","intent":"faq|schedule|reschedule|cancel|handoff|unknown","confidence":0.0,"appointment_action":{"should_update":false,"action_type":"none|create|update|cancel","appointment_datetime":null,"patient_name":null,"date_of_birth":null,"cpf":null,"procedure":null,"notes":null}}'
   ].filter(Boolean).join("\n");
 }
 

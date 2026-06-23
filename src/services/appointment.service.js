@@ -3,7 +3,7 @@ import {
   findMostRecentAppointmentByPatient,
   updateAppointmentById
 } from "../repositories/appointment.repository.js";
-import { createProvisionalPatient } from "../repositories/patient.repository.js";
+import { createProvisionalPatient, findPatientByClinicAndCpf } from "../repositories/patient.repository.js";
 import { findClinicById } from "../repositories/clinic.repository.js";
 import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
@@ -119,13 +119,27 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
         && /^\d{4}-\d{2}-\d{2}$/.test(action.date_of_birth.trim())
         ? action.date_of_birth.trim()
         : null;
-      effectivePatient = await createProvisionalPatient({
-        clinicId,
-        phone,
-        name: nameFromAction,
-        dateOfBirth: dob,
-      });
-      logger.info({ clinicId, phone, patientId: effectivePatient?.id }, "[APPOINTMENT] Paciente provisório criado pela IA");
+      const cpfDigits = typeof action.cpf === "string" ? action.cpf.replace(/\D/g, "") : "";
+
+      // Identifica por CPF antes de criar: evita cadastro duplicado (inclusive
+      // quando se agenda para outra pessoa no mesmo telefone).
+      if (cpfDigits.length >= 11) {
+        effectivePatient = await findPatientByClinicAndCpf(clinicId, cpfDigits);
+        if (effectivePatient?.id) {
+          logger.info({ clinicId, patientId: effectivePatient.id }, "[APPOINTMENT] Paciente existente localizado por CPF");
+        }
+      }
+
+      if (!effectivePatient?.id) {
+        effectivePatient = await createProvisionalPatient({
+          clinicId,
+          phone,
+          name: nameFromAction,
+          dateOfBirth: dob,
+          cpf: cpfDigits || null,
+        });
+        logger.info({ clinicId, phone, patientId: effectivePatient?.id }, "[APPOINTMENT] Paciente provisório criado pela IA");
+      }
     }
     if (!effectivePatient?.id) {
       return {
