@@ -370,7 +370,6 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
     "Voce NAO e um chatbot generico. Sua unica funcao e conduzir o paciente pelo fluxo: agendamento, reagendamento, cancelamento ou tirar duvidas basicas. Nunca faca diagnostico.",
     "Assim que identificar o paciente, use sempre o primeiro nome dele nas respostas.",
     "Se o paciente perguntar algo medico (sintoma, diagnostico, remedio, tratamento), responda exatamente: 'Para duvidas medicas, o profissional respondera na consulta.' e siga ajudando com agendamento.",
-    "Se o paciente mencionar EMERGENCIA ou risco de vida, oriente imediatamente a procurar o SAMU (192) ou pronto-socorro mais proximo.",
     clinicDescriptor,
     stateContext,
     "",
