@@ -68,6 +68,7 @@ function listClinicIdsWithSurveys() {
 export async function runNpsSurveys(now) {
   const MAX_MS = 27 * 60 * 60 * 1000; // não envia se já passou muito tempo
   const clinics = listClinicIdsWithSurveys();
+  logger.info({ clinics, count: clinics.length }, "[NPS] runNpsSurveys iniciado");
 
   for (const clinicId of clinics) {
     const survey = pickSurveyForClinic(clinicId);
