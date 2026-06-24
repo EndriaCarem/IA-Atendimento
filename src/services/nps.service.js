@@ -84,12 +84,17 @@ export async function runNpsSurveys(now) {
         a.start_time &&
         ["completed", "realizada", "concluida", "confirmed", "confirmada"].includes(a.status)
     );
+    logger.info({ clinicId, apptCount: appts.length }, "[NPS] Agendamentos encontrados");
 
     for (const apt of appts) {
       const start = new Date(apt.start_time).getTime();
       if (Number.isNaN(start)) continue;
       const elapsed = now.getTime() - start;
-      if (elapsed < minMs || elapsed > MAX_MS) continue;
+      logger.info({ appointmentId: apt.id, elapsed, minMs, MAX_MS }, `[NPS] Verificando ${apt.patient_name} (elapsed: ${(elapsed/60000).toFixed(1)}min)`);
+      if (elapsed < minMs || elapsed > MAX_MS) {
+        logger.info({ reason: elapsed < minMs ? "too soon" : "too late" }, "[NPS] Ignorando");
+        continue;
+      }
 
       // Dedupe: 1 NPS por consulta (appointment_id é único no Supabase também).
       const already = dbFindOne(
