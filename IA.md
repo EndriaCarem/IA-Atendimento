@@ -1,4 +1,4 @@
-# AI.md — Backend da Secretária IA (IACLIN)
+# IA.md — Backend da Secretária IA (IACLIN)
 
 ## 🎯 O que é este projeto?
 

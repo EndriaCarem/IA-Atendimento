@@ -101,7 +101,7 @@ Everything is synced:
 
 ## 📖 Full Documentation
 
-- [CLAUDE.md](CLAUDE.md) — Developer onboarding guide
+- [IA.md](IA.md) — Developer onboarding guide
 - [VALIDACAO-COMPLETA.md](VALIDACAO-COMPLETA.md) — Test status
 
 ---
