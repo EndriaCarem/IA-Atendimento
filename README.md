@@ -1,6 +1,6 @@
-# IA Atendimento — Secretária Virtual WhatsApp
+# IA Atendimento — Virtual Secretary WhatsApp
 
-Sistema de IA para agendamento, reagendamento e atendimento de pacientes via WhatsApp. Backend Node.js + Lovable frontend com integração via webhooks.
+AI system for appointment scheduling, rescheduling and patient service via WhatsApp. Node.js backend + Lovable frontend with webhook integration.
 
 ## 🚀 Stack
 
@@ -11,105 +11,101 @@ Sistema de IA para agendamento, reagendamento e atendimento de pacientes via Wha
 - **AI:** Groq (primary) + Google Gemini (fallback)
 - **Deployment:** EC2 + Docker Compose + ngrok
 
-## 📋 O Básico (pra apresentar)
+## 📋 The Basics (for presentations)
 
-1. **Paciente manda mensagem no WhatsApp**
-2. **Evolution API recebe** e envia webhook pro backend
-3. **Backend processa:**
-   - Identifica paciente
-   - Carrega histórico de conversa
-   - Chama IA (Groq) com contexto
-   - IA decide: agendar, cancelar, tirar dúvida, etc
-4. **Resposta volta pro WhatsApp**
-5. **Lovable sincroniza agendamentos** com banco de dados
+1. **Patient sends message on WhatsApp**
+2. **Evolution API receives** and sends webhook to backend
+3. **Backend processes:**
+   - Identifies patient
+   - Loads conversation history
+   - Calls AI (Groq) with context
+   - AI decides: schedule, cancel, answer question, etc
+4. **Response goes back to WhatsApp**
+5. **Lovable syncs appointments** with database
 
-## 🏗️ Arquitetura (Simplificado)
+## 🏗️ Architecture (Simplified)
 
 ```
-WhatsApp → Evolution (Docker) → Backend (Node.js) → IA (Groq)
+WhatsApp → Evolution (Docker) → Backend (Node.js) → AI (Groq)
    ↑                                  ↓
    └──────────────────────────────────┘
    
-Lovable (Painel Admin) ← Sync ← Backend
+Lovable (Admin Panel) ← Sync ← Backend
 ```
 
-## 🔑 Componentes Principais
+## 🔑 Core Components
 
 ### Backend (`/src`)
-- **message-processor.service.js** — processa msg, detecta intenção
-- **ai-orchestrator.service.js** — monta prompt, chama IA
-- **appointment.service.js** — lógica de agendamento
-- **automation-scheduler.service.js** — lembretes, aniversário, NPS
+- **message-processor.service.js** — processes messages, detects intent
+- **ai-orchestrator.service.js** — builds prompt, calls AI
+- **appointment.service.js** — scheduling logic
+- **automation-scheduler.service.js** — reminders, birthdays, NPS
 
 ### Evolution API (Docker)
-- Conecta WhatsApp via QR code
-- Envia/recebe mensagens
-- Gerencia conexão
+- Connects WhatsApp via QR code
+- Sends/receives messages
+- Manages connection
 
 ### Lovable
-- Painel admin (procedures, doctors, business hours)
-- Sincroniza via HTTP (`POST /api/sync/*`)
-- Edge functions processam aprovações
+- Admin panel (procedures, doctors, business hours)
+- Syncs via HTTP (`POST /api/sync/*`)
+- Edge functions process approvals
 
 ## 🚀 Deploy
 
 ```bash
-# EC2 (produção)
+# EC2 (production)
 ssh ec2-user@52.14.40.145
 cd /home/ec2-user/iaclin
 ./deploy.sh  # git pull + restart
 ```
 
-## 🧠 Fluxo de Agendamento
+## 🧠 Scheduling Flow
 
-1. "Quero agendar" → IA pede procedimento
-2. "Limpeza" → IA pede data/horário
-3. "Sexta às 10h" → IA confirma
-4. Confirmado → Agendamento em `pending_approval`
-5. Clínica aprova no Lovable → SMS confirmação pro paciente
-6. 3h depois → NPS dispara ("Como foi?")
+1. "I want to book" → AI asks for procedure
+2. "Cleaning" → AI asks for date/time
+3. "Friday at 10am" → AI confirms
+4. Confirmed → Appointment in `pending_approval`
+5. Clinic approves on Lovable → SMS confirmation to patient
+6. 3 hours later → NPS survey ("How was it?")
 
 ## 🔧 Config (Lovable Sync)
 
-Tudo vem sincronizado:
-- Procedures (Limpeza, Profilaxia, etc)
-- Doctors (nome, especialidade, horários)
-- Insurance plans (convênios)
-- Business hours (seg-sex 9-17h)
-- Custom prompt (instruções personalizadas)
+Everything is synced:
+- Procedures (Cleaning, Prophylaxis, etc)
+- Doctors (name, specialties, schedules)
+- Insurance plans
+- Business hours (Mon-Fri 9-5pm)
+- Custom prompts (personalized instructions)
 
-## 📞 Endpoints Críticos
+## 📞 Critical Endpoints
 
-- `POST /webhooks/evolution/messages.upsert` — nova msg do WhatsApp
-- `POST /api/sync/config` — Lovable envia config
-- `POST /api/sync/appointments` — Lovable aprova agendamento
+- `POST /webhooks/evolution/messages.upsert` — new WhatsApp message
+- `POST /api/sync/config` — Lovable sends config
+- `POST /api/sync/appointments` — Lovable approves appointment
 - `GET /health` — health check
 
-## 🚨 Troubleshoot Rápido
+## 🚨 Quick Troubleshooting
 
-**IA não responde?**
-- Checar logs: `pm2 logs iaclin-backend`
-- Chave Groq expirou? → usar Gemini fallback
+**AI not responding?**
+- Check logs: `pm2 logs iaclin-backend`
+- Groq key expired? → using Gemini fallback
 
-**Agendamento não sincroniza?**
-- Lovable faz polling em `GET /api/sync/...`
-- Checar se status = "pending_approval"
+**Appointment not syncing?**
+- Lovable polls `GET /api/sync/...`
+- Check status = "pending_approval"
 
-**WhatsApp desconecta?**
-- Cada deploy mata conexão → rescanear QR
-- Pronto, reconecta automático
+**WhatsApp disconnects?**
+- Each deploy kills connection → rescan QR
+- Then auto-reconnects
 
-## 📖 Docs Completas
+## 📖 Full Documentation
 
-- [ARQUITETURA.md](ARQUITETURA.md) — Tech deep dive
-- [SETUP.md](SETUP.md) — Como rodar local
-- [DOCKER.md](DOCKER.md) — Containers explicados
-- [LOVABLE.md](LOVABLE.md) — Integração frontend
-- [VALIDACAO-COMPLETA.md](VALIDACAO-COMPLETA.md) — Testes
-- [GAPS.md](GAPS.md) — O que falta
+- [CLAUDE.md](CLAUDE.md) — Developer onboarding guide
+- [VALIDACAO-COMPLETA.md](VALIDACAO-COMPLETA.md) — Test status
 
 ---
 
 **Status:** ✅ Production-ready  
 **Last update:** 2026-06-24  
-**Next priority:** Auto-reject pending (20min/1h), lembrete 24h
+**Next priority:** Auto-reject pending (20min/1h), 24h reminders
