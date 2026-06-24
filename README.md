@@ -1,145 +1,115 @@
-<div align="center">
+# IA Atendimento — Secretária Virtual WhatsApp
 
-# IACLIN · Secretária IA (Backend)
+Sistema de IA para agendamento, reagendamento e atendimento de pacientes via WhatsApp. Backend Node.js + Lovable frontend com integração via webhooks.
 
-**Backend de atendimento por WhatsApp com IA para clínicas e consultórios.**
+## 🚀 Stack
 
-Atendimento conversacional, agendamento inteligente e automações de relacionamento —
-o motor que dá vida à **Secretária IA** do painel IACLIN.
+- **Backend:** Node.js + Express (port 3333)
+- **WhatsApp:** Evolution API (Docker container)
+- **Frontend:** Lovable (edge functions + sync)
+- **Database:** JSON DB (local) + Supabase (sync)
+- **AI:** Groq (primary) + Google Gemini (fallback)
+- **Deployment:** EC2 + Docker Compose + ngrok
 
-</div>
+## 📋 O Básico (pra apresentar)
 
----
+1. **Paciente manda mensagem no WhatsApp**
+2. **Evolution API recebe** e envia webhook pro backend
+3. **Backend processa:**
+   - Identifica paciente
+   - Carrega histórico de conversa
+   - Chama IA (Groq) com contexto
+   - IA decide: agendar, cancelar, tirar dúvida, etc
+4. **Resposta volta pro WhatsApp**
+5. **Lovable sincroniza agendamentos** com banco de dados
 
-## Visão geral
-
-Este é o **serviço de backend** da Secretária IA. Ele recebe as mensagens dos pacientes
-pelo WhatsApp, conduz a conversa com um agente de IA, cria pedidos de agendamento e dispara
-as automações de relacionamento (lembretes, aniversário, retorno e pesquisa de satisfação).
-
-Faz parte de um sistema de dois componentes:
-
-| Componente | Repositório | Responsabilidade |
-|---|---|---|
-| **Painel & Plataforma** (front) | `IACLIN` | Interface da clínica, gestão e banco de dados (Supabase) |
-| **Secretária IA** (este repo) | `IA-Atendimento` | Conversa por WhatsApp, IA, agendamento e automações |
-
-> O painel **escreve** os dados da clínica e os sincroniza para este backend.
-> Este backend **conversa** com o paciente e devolve os pedidos criados pela IA para o painel aprovar.
-
----
-
-## Principais capacidades
-
-- **Atendimento em linguagem natural** — entende a intenção do paciente sem menus ou botões.
-- **Agendamento com disponibilidade real** — oferece horários da agenda, nunca inventa.
-- **Cadastro mínimo** — paciente novo informa apenas o nome para agendar.
-- **Regras de segurança** — encaminha emergências (SAMU), desvia dúvidas clínicas para o
-  profissional e respeita o credenciamento de convênios.
-- **Fila de aprovação** — todo agendamento criado pela IA fica aguardando confirmação da clínica.
-- **Automações de relacionamento** — lembrete de consulta, confirmação, retorno, aniversário
-  e **NPS** (pesquisa de satisfação com captura da nota 0–10).
-- **Handoff para humano** — transfere a conversa quando necessário.
-- **Monitor de conexão** — acompanha a saúde da sessão do WhatsApp e registra o motivo de quedas.
-
----
-
-## Arquitetura
+## 🏗️ Arquitetura (Simplificado)
 
 ```
-WhatsApp  ──▶  Evolution API  ──▶  Webhook  ──▶  Secretária IA (este backend)
-                                                      │
-                                  ┌───────────────────┼───────────────────┐
-                                  ▼                   ▼                   ▼
-                          Orquestrador IA      Agendamento         Automações
-                          (conversa/intenção)  (fila de aprovação) (lembrete/NPS/...)
-                                                      │
-                                                      ▼
-                                          Painel IACLIN  ◀── sincronização ──▶  Supabase
+WhatsApp → Evolution (Docker) → Backend (Node.js) → IA (Groq)
+   ↑                                  ↓
+   └──────────────────────────────────┘
+   
+Lovable (Painel Admin) ← Sync ← Backend
 ```
 
-- **Provedores de IA** plugáveis (Gemini, Ollama e outros) selecionados por configuração.
-- **Persistência local** leve (json-db) para o estado operacional; o Supabase é a fonte de
-  verdade dos dados da clínica, sincronizados pelo painel.
-- **Evolution API** (auto-hospedada) como gateway do WhatsApp.
+## 🔑 Componentes Principais
 
-### Estrutura do código
+### Backend (`/src`)
+- **message-processor.service.js** — processa msg, detecta intenção
+- **ai-orchestrator.service.js** — monta prompt, chama IA
+- **appointment.service.js** — lógica de agendamento
+- **automation-scheduler.service.js** — lembretes, aniversário, NPS
 
-```
-src/
-├── server.js            Ponto de entrada
-├── app.js               Configuração do Express
-├── routes/              Definição de rotas (webhook, sync, whatsapp, dados)
-├── controllers/         Camada HTTP
-├── services/            Regras de negócio
-│   ├── ai-orchestrator         Conversa e detecção de intenção
-│   ├── message-processor       Pipeline de mensagens recebidas
-│   ├── appointment             Criação e estado dos agendamentos
-│   ├── automation-*            Disparo e envio das automações
-│   ├── nps                     Pesquisa de satisfação (envio + captura)
-│   └── evolution-*             Saúde e heartbeat da conexão WhatsApp
-├── repositories/        Acesso a dados
-├── lib/                 Integrações (Evolution, provedores de IA, json-db)
-└── utils/               Utilitários
-```
+### Evolution API (Docker)
+- Conecta WhatsApp via QR code
+- Envia/recebe mensagens
+- Gerencia conexão
 
----
+### Lovable
+- Painel admin (procedures, doctors, business hours)
+- Sincroniza via HTTP (`POST /api/sync/*`)
+- Edge functions processam aprovações
 
-## Começando
-
-### Pré-requisitos
-
-- Node.js 20+
-- Uma instância da [Evolution API](https://github.com/EvolutionAPI/evolution-api) (para o WhatsApp)
-- Projeto Supabase (compartilhado com o painel IACLIN)
-- Chave de um provedor de IA (Gemini por padrão)
-
-### Instalação
+## 🚀 Deploy
 
 ```bash
-npm install
-cp .env.example .env   # preencha as variáveis
-npm run dev            # inicia em modo desenvolvimento (porta 3333)
+# EC2 (produção)
+ssh ec2-user@52.14.40.145
+cd /home/ec2-user/iaclin
+./deploy.sh  # git pull + restart
 ```
 
-Verificações úteis:
+## 🧠 Fluxo de Agendamento
 
-```bash
-npm run check:evolution   # testa a conexão com a Evolution API
-npm run check:gemini      # valida a chave do provedor de IA
-npm test                  # roda os testes
-```
+1. "Quero agendar" → IA pede procedimento
+2. "Limpeza" → IA pede data/horário
+3. "Sexta às 10h" → IA confirma
+4. Confirmado → Agendamento em `pending_approval`
+5. Clínica aprova no Lovable → SMS confirmação pro paciente
+6. 3h depois → NPS dispara ("Como foi?")
+
+## 🔧 Config (Lovable Sync)
+
+Tudo vem sincronizado:
+- Procedures (Limpeza, Profilaxia, etc)
+- Doctors (nome, especialidade, horários)
+- Insurance plans (convênios)
+- Business hours (seg-sex 9-17h)
+- Custom prompt (instruções personalizadas)
+
+## 📞 Endpoints Críticos
+
+- `POST /webhooks/evolution/messages.upsert` — nova msg do WhatsApp
+- `POST /api/sync/config` — Lovable envia config
+- `POST /api/sync/appointments` — Lovable aprova agendamento
+- `GET /health` — health check
+
+## 🚨 Troubleshoot Rápido
+
+**IA não responde?**
+- Checar logs: `pm2 logs iaclin-backend`
+- Chave Groq expirou? → usar Gemini fallback
+
+**Agendamento não sincroniza?**
+- Lovable faz polling em `GET /api/sync/...`
+- Checar se status = "pending_approval"
+
+**WhatsApp desconecta?**
+- Cada deploy mata conexão → rescanear QR
+- Pronto, reconecta automático
+
+## 📖 Docs Completas
+
+- [ARQUITETURA.md](ARQUITETURA.md) — Tech deep dive
+- [SETUP.md](SETUP.md) — Como rodar local
+- [DOCKER.md](DOCKER.md) — Containers explicados
+- [LOVABLE.md](LOVABLE.md) — Integração frontend
+- [VALIDACAO-COMPLETA.md](VALIDACAO-COMPLETA.md) — Testes
+- [GAPS.md](GAPS.md) — O que falta
 
 ---
 
-## Configuração
-
-As variáveis ficam no `.env` (veja o `.env.example` como referência). As principais:
-
-| Variável | Descrição |
-|---|---|
-| `PORT` | Porta do servidor (padrão `3333`) |
-| `AI_PROVIDER` | Provedor de IA (`gemini`, `ollama`, ...) |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Credenciais do provedor padrão |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Acesso ao Supabase |
-| `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` | Gateway do WhatsApp |
-| `DEFAULT_TIMEZONE` | Fuso horário das automações |
-
-> Segredos nunca são versionados — `.env*` e chaves `*.pem` estão no `.gitignore`.
-
----
-
-## Integração com o painel
-
-O painel sincroniza os dados da clínica para este backend e lê de volta o que a IA produziu:
-
-- **Recebe do painel:** configuração da clínica, médicos, pacientes, disponibilidade e
-  questionários de NPS.
-- **Devolve ao painel:** agendamentos criados pela IA (fila de aprovação) e respostas de NPS
-  captadas — o painel grava no Supabase e confirma a sincronização.
-
----
-
-## Licença
-
-Projeto proprietário. Todos os direitos reservados.
+**Status:** ✅ Production-ready  
+**Last update:** 2026-06-24  
+**Next priority:** Auto-reject pending (20min/1h), lembrete 24h
