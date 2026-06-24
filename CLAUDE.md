@@ -1,4 +1,4 @@
-# CLAUDE.md — Backend da Secretária IA (IACLIN)
+# AI.md — Backend da Secretária IA (IACLIN)
 
 ## 🎯 O que é este projeto?
 
