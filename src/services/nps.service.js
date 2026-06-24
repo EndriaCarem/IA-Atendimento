@@ -81,7 +81,7 @@ export async function runNpsSurveys(now) {
         a.clinic_id === clinicId &&
         a.patient_phone &&
         a.start_time &&
-        ["completed", "realizada", "concluida"].includes(a.status)
+        ["completed", "realizada", "concluida", "confirmed", "confirmada"].includes(a.status)
     );
 
     for (const apt of appts) {
