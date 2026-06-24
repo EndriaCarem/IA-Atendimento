@@ -65,6 +65,22 @@ export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt 
       // intencionalmente sem ação — ver comentário acima.
     }
 
+    // Rejeição de agendamento pendente
+    if (newStatus === "rejected") {
+      const detalhe = buildCancelDetail(apt);
+      const defaultMsg = detalhe
+        ? `Olá {patient_name}, infelizmente não conseguimos agendar sua ${detalhe} no momento. Por favor, tente novamente mais tarde ou entre em contato conosco. Desculpe o transtorno! 🙏`
+        : "Olá {patient_name}, infelizmente não conseguimos confirmar seu agendamento no momento. Por favor, tente novamente mais tarde ou entre em contato conosco.";
+      await dispatchAutomationMessage({
+        clinicId,
+        type: "rejection",
+        dedupeKey: `rejection:${apt.id}`,
+        template: defaultMsg,
+        phone: apt.patient_phone,
+        context,
+      });
+    }
+
     // Aviso de cancelamento/reagendamento: SÓ quando a CLÍNICA cancela. Se foi o
     // PRÓPRIO paciente que cancelou pela IA, ele já recebeu "Consulta cancelada
     // com sucesso" na conversa — disparar de novo aqui seria mensagem duplicada.
