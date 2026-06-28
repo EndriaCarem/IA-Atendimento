@@ -53,17 +53,28 @@ export async function findClinicById(clinicId) {
   const handoff = findAiSecretaryHandoffByClinicId(clinicId);
 
   const clinicConfig = dbFindOne("clinic_config", (r) => r.clinic_id === clinicId);
+  const syncedDoctors = dbFind("doctors", (d) => d.clinic_id === clinicId && d.active !== false);
+  const doctors = syncedDoctors.length > 0
+    ? syncedDoctors
+    : (Array.isArray(clinicConfig?.doctors) ? clinicConfig.doctors : []);
+  const timezone =
+    clinicData.timezone ??
+    clinicData.time_zone ??
+    clinicConfig?.timezone ??
+    clinicConfig?.time_zone ??
+    env.DEFAULT_TIMEZONE;
 
   return {
     id: clinicData.id,
     name: clinicData.name ?? null,
     address: clinicData.address ?? clinicConfig?.address ?? null,
+    timezone,
     customPrompt: aiConfig?.[env.COL_AI_CONFIG_PROMPT] ?? "",
     aiEnabled: aiConfig?.enabled ?? true,
-    businessHours: clinicData.business_hours ?? null,
+    businessHours: clinicData.business_hours ?? clinicConfig?.business_hours ?? null,
     procedures: Array.isArray(clinicConfig?.procedures) ? clinicConfig.procedures : [],
     insurancePlans: Array.isArray(clinicConfig?.insurance_plans) ? clinicConfig.insurance_plans : [],
-    doctors: Array.isArray(clinicConfig?.doctors) ? clinicConfig.doctors : [],
+    doctors,
     handoff
   };
 }

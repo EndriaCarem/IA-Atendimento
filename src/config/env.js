@@ -71,6 +71,9 @@ const envSchema = z
     EVOLUTION_API_URL: optionalUrlString,
     EVOLUTION_API_KEY: optionalNonEmptyString,
     EVOLUTION_WEBHOOK_SECRET: optionalNonEmptyString,
+    API_AUTH_TOKEN: optionalNonEmptyString,
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+    RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().nonnegative().default(0),
 
     TABLE_CLINICS: z.string().default("clinics"),
     TABLE_AI_CONFIG: z.string().default("ai_secretary_config"),

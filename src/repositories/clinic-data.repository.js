@@ -13,6 +13,7 @@
  */
 import { dbFindOne, dbFind, dbUpsert, dbInsert, dbUpdate } from "../lib/json-db.js";
 import { normalizePhone } from "../utils/phone.js";
+import { env } from "../config/env.js";
 
 // ─────────────────────────────────────────────
 // 1. CONFIG PÚBLICA DA CLÍNICA
@@ -90,13 +91,21 @@ const WEEKDAY_KEY_BY_INDEX = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 // Quando não há professional_availability cadastrada, deriva a janela de
 // atendimento a partir do horário de funcionamento da clínica (business_hours).
 // Assim a IA consegue oferecer horários mesmo sem o cadastro detalhado por profissional.
+function getClinicTimezone(clinicId) {
+  const clinic = dbFindOne("clinics", (c) => c.id === clinicId);
+  const config = dbFindOne("clinic_config", (c) => c.clinic_id === clinicId);
+  return clinic?.timezone ?? clinic?.time_zone ?? config?.timezone ?? config?.time_zone ?? env.DEFAULT_TIMEZONE;
+}
+
 function availabilityFromBusinessHours(clinicId, dayOfWeek) {
   const clinic = dbFindOne("clinics", (c) => c.id === clinicId);
+  const config = dbFindOne("clinic_config", (c) => c.clinic_id === clinicId);
   const hours = clinic?.business_hours;
-  if (!hours || typeof hours !== "object") return [];
+  const businessHours = hours && typeof hours === "object" ? hours : config?.business_hours;
+  if (!businessHours || typeof businessHours !== "object") return [];
 
   const key = WEEKDAY_KEY_BY_INDEX[dayOfWeek];
-  const day = hours[key];
+  const day = businessHours[key];
   if (!day || day.enabled === false || !day.open || !day.close) return [];
 
   // 00:00 como fechamento é tratado como fim do dia (23:59) para não gerar janela vazia.
@@ -106,13 +115,11 @@ function availabilityFromBusinessHours(clinicId, dayOfWeek) {
   return [{ professional_id: null, start_time: day.open, end_time: close }];
 }
 
-// Converte uma hora LOCAL (America/Sao_Paulo) numa data para o timestamp UTC (ms).
-// Ex.: ("2026-06-15", 8, 0) → ms de 08:00 horário de SP, mesmo o servidor em UTC.
-const CLINIC_TZ = "America/Sao_Paulo";
-function localTimeToUtcMs(date, hour, minute) {
+// Converte uma hora LOCAL da clínica numa data para o timestamp UTC (ms).
+function localTimeToUtcMs(date, hour, minute, timeZone) {
   // Descobre o offset do fuso para aquela data (cobre eventual horário de verão).
   const probe = new Date(`${date}T12:00:00Z`);
-  const localStr = probe.toLocaleString("en-US", { timeZone: CLINIC_TZ });
+  const localStr = probe.toLocaleString("en-US", { timeZone });
   const offsetMin = (probe.getTime() - new Date(localStr).getTime()) / 60000;
   // Monta o instante: meia-noite UTC da data + hora desejada + offset do fuso.
   const baseUtc = new Date(`${date}T00:00:00Z`).getTime();
@@ -121,6 +128,7 @@ function localTimeToUtcMs(date, hour, minute) {
 
 export function getFreeSlots(clinicId, date, dentistId, durationMin = 60) {
   const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+  const timeZone = getClinicTimezone(clinicId);
 
   let availability = dbFind(
     "professional_availability",
@@ -158,11 +166,8 @@ export function getFreeSlots(clinicId, date, dentistId, durationMin = 60) {
   for (const avail of availability) {
     const [sh, sm] = avail.start_time.split(":").map(Number);
     const [eh, em] = avail.end_time.split(":").map(Number);
-    // CRÍTICO (timezone): o horário da clínica ("08:00") é LOCAL (America/Sao_Paulo),
-    // mas o servidor roda em UTC. Sem isso, new Date("...T08:00") = 08:00 UTC = 05:00
-    // em SP (slots apareciam às 5h da manhã). localTimeToUtcMs converte certo.
-    const windowStart = localTimeToUtcMs(date, sh, sm);
-    const windowEnd   = localTimeToUtcMs(date, eh, em);
+    const windowStart = localTimeToUtcMs(date, sh, sm, timeZone);
+    const windowEnd   = localTimeToUtcMs(date, eh, em, timeZone);
 
     let cursor = windowStart;
 
@@ -260,4 +265,3 @@ export function cancelAppointmentLocal({ appointmentId, clinicId, reason }) {
 
 // ─── Helper ───────────────────────────────────
 function pad(n) { return String(n).padStart(2, "0"); }
-

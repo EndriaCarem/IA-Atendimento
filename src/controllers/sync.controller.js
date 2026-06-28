@@ -13,6 +13,7 @@
  * POST /api/clinics/:clinicId/appointments/:id/sync-confirm
  *   (Lovable confirma que criou o agendamento no Supabase; backend marca sync_status=synced)
  */
+import { randomUUID } from "crypto";
 import { env } from "../config/env.js";
 import { dbUpsert, dbInsert, dbFind, dbUpdate, dbFindOne } from "../lib/json-db.js";
 import { normalizePhone } from "../utils/phone.js";
@@ -28,6 +29,8 @@ export function syncConfigController(req, res, next) {
       name,
       address,
       business_hours,
+      timezone,
+      time_zone,
       procedures,
       insurance_plans,
       rooms,
@@ -50,6 +53,7 @@ export function syncConfigController(req, res, next) {
       _synced: true,
       _synced_at: new Date().toISOString(),
     };
+    if (timezone || time_zone) configRecord.timezone = timezone ?? time_zone;
     if (Array.isArray(procedures))      configRecord.procedures      = procedures;
     if (Array.isArray(insurance_plans)) configRecord.insurance_plans = insurance_plans;
     if (Array.isArray(rooms))           configRecord.rooms           = rooms;
@@ -59,17 +63,15 @@ export function syncConfigController(req, res, next) {
 
     // Popula "clinics" para que findClinicById() resolva o tenant no webhook real.
     // name é opcional: se o Lovable não enviar, fica null e a IA usa "Clinica nao identificada."
-    dbUpsert(
-      "clinics",
-      {
-        id:             clinic_id,
-        name:           name ?? null,
-        address:        address ?? null,
-        business_hours: business_hours ?? null,
-        _synced_at:     new Date().toISOString(),
-      },
-      "id"
-    );
+    const clinicRecord = {
+      id:             clinic_id,
+      name:           name ?? null,
+      address:        address ?? null,
+      business_hours: business_hours ?? null,
+      _synced_at:     new Date().toISOString(),
+    };
+    if (timezone || time_zone) clinicRecord.timezone = timezone ?? time_zone;
+    dbUpsert("clinics", clinicRecord, "id");
 
     // Sincroniza config de handoff humano quando o Lovable enviar o campo.
     // Campo opcional — ausência não altera registro existente.
@@ -88,8 +90,8 @@ export function syncConfigController(req, res, next) {
       );
     }
 
-    logger.info({ clinic_id, procedures: record.procedures.length }, "[SYNC] Config sincronizada");
-    res.json({ ok: true, data: record });
+    logger.info({ clinic_id, procedures: Array.isArray(record.procedures) ? record.procedures.length : 0 }, "[SYNC] Config sincronizada");
+    res.json({ ok: true, success: true, data: record });
   } catch (err) {
     next(err);
   }
@@ -120,7 +122,7 @@ export function syncPatientController(req, res, next) {
     };
 
     const record = dbUpsert("patients", normalized, "id");
-    res.json({ ok: true, data: record });
+    res.json({ ok: true, success: true, data: record });
   } catch (err) {
     next(err);
   }
@@ -147,7 +149,7 @@ export function syncPatientsController(req, res, next) {
     }
 
     logger.info({ count: results.length }, "[SYNC] Pacientes sincronizados em lote");
-    res.json({ ok: true, synced: results.length });
+    res.json({ ok: true, success: true, synced: results.length });
   } catch (err) {
     next(err);
   }
@@ -184,7 +186,7 @@ export function syncDoctorController(req, res, next) {
       "id"
     );
 
-    res.json({ ok: true, data: record });
+    res.json({ ok: true, success: true, data: record });
   } catch (err) {
     next(err);
   }
@@ -222,7 +224,7 @@ export function syncDoctorsController(req, res, next) {
     }
 
     logger.info({ clinic_id, saved }, "[SYNC] Médicos sincronizados");
-    res.json({ ok: true, synced: saved });
+    res.json({ ok: true, success: true, synced: saved });
   } catch (err) {
     next(err);
   }
@@ -256,7 +258,7 @@ export function syncAvailabilityController(req, res, next) {
       saved++;
     }
     logger.info({ clinic_id, saved }, "[SYNC] Disponibilidade sincronizada");
-    res.json({ ok: true, synced: saved });
+    res.json({ ok: true, success: true, synced: saved });
   } catch (err) {
     next(err);
   }
@@ -267,7 +269,12 @@ export function syncAvailabilityController(req, res, next) {
 
 export async function syncAppointmentsController(req, res, next) {
   try {
-    const { clinic_id, appointments } = req.body ?? {};
+    const { clinic_id } = req.body ?? {};
+    const appointments = Array.isArray(req.body?.appointments)
+      ? req.body.appointments
+      : (req.body?.patient_name || req.body?.phone || req.body?.patient_phone || req.body?.start_time
+        ? [req.body]
+        : null);
     if (!clinic_id || !Array.isArray(appointments)) {
       return res.status(400).json({ ok: false, error: "clinic_id e appointments[] são obrigatórios" });
     }
@@ -275,20 +282,20 @@ export async function syncAppointmentsController(req, res, next) {
     let saved = 0;
     const statusChanges = [];
     for (const apt of appointments) {
-      if (!apt.id) continue;
+      const appointmentId = apt.id ?? randomUUID();
 
       // Captura status anterior para disparar hooks de automação (confirmação/reagendamento)
-      const previous = dbFindOne("synced_appointments", (a) => a.id === apt.id);
+      const previous = dbFindOne("synced_appointments", (a) => a.id === appointmentId);
       const prevStatus = previous?.status ?? null;
 
       const record = {
-        id: apt.id,
+        id: appointmentId,
         clinic_id,
         dentist_id:    apt.dentist_id    ?? null,
         dentist_name:  apt.dentist_name  ?? null,
         patient_id:    apt.patient_id    ?? null,
         patient_name:  apt.patient_name  ?? null,
-        patient_phone: apt.patient_phone ? normalizePhone(apt.patient_phone) : null,
+        patient_phone: apt.patient_phone || apt.phone ? normalizePhone(apt.patient_phone ?? apt.phone) : null,
         procedure:     apt.procedure     ?? apt.service ?? null,
         start_time:    apt.start_time    ?? null,
         end_time:      apt.end_time      ?? null,
@@ -297,18 +304,19 @@ export async function syncAppointmentsController(req, res, next) {
         _synced_at: new Date().toISOString(),
       };
       dbUpsert("synced_appointments", record, "id");
-      statusChanges.push({ prevStatus, apt: record });
+      statusChanges.push({ prevStatus, prevStartTime: previous?.start_time ?? null, apt: record });
       saved++;
     }
 
     logger.info({ clinic_id, saved }, "[SYNC] Agendamentos sincronizados");
     // Responde já; dispara hooks em background (não bloqueia o sync)
-    res.json({ ok: true, synced: saved });
+    res.json({ ok: true, success: true, synced: saved });
 
     for (const change of statusChanges) {
       handleAppointmentStatusChange({
         clinicId: clinic_id,
         prevStatus: change.prevStatus,
+        prevStartTime: change.prevStartTime,
         apt: change.apt,
       }).catch(() => {});
     }
@@ -346,7 +354,7 @@ export function listAiAppointmentsController(req, res, next) {
       };
     });
 
-    res.json({ ok: true, data: enriched });
+    res.json({ ok: true, success: true, data: enriched });
   } catch (err) {
     next(err);
   }
@@ -374,7 +382,7 @@ export function syncConfirmAppointmentController(req, res, next) {
       return res.status(404).json({ ok: false, error: "Agendamento não encontrado" });
     }
 
-    res.json({ ok: true, data: record });
+    res.json({ ok: true, success: true, data: record });
   } catch (err) {
     next(err);
   }

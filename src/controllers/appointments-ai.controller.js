@@ -40,7 +40,7 @@ export function createAppointmentAiController(req, res, next) {
       }
 
       const appointment = createAppointmentLocal({
-        clinicId, patient_id, dentistId: dentist_id,
+        clinicId, patientId: patient_id, dentistId: dentist_id,
         startTime: start_time, endTime: end_time,
         procedureId: procedure_id, notes, source: source ?? "ai",
       });
@@ -60,7 +60,7 @@ export function createAppointmentAiController(req, res, next) {
 
     // Sem idempotência — aceito, mas avisado no log
     const appointment = createAppointmentLocal({
-      clinicId, patient_id, dentistId: dentist_id,
+      clinicId, patientId: patient_id, dentistId: dentist_id,
       startTime: start_time, endTime: end_time,
       procedureId: procedure_id, notes, source: source ?? "ai",
     });

@@ -39,5 +39,8 @@ router.post("/clinics/:clinicId/appointments/:appointmentId/sync-confirm", syncC
 router.post("/sync/nps-surveys",                                             syncNpsSurveysController);
 router.get("/clinics/:clinicId/nps/pending-results",                        listNpsPendingResultsController);
 router.post("/clinics/:clinicId/nps/pending-results/:pendingId/sync-confirm", confirmNpsResultSyncController);
+// Aliases usados por checklists/integrações antigas.
+router.get("/nps/pending-results",                                           listNpsPendingResultsController);
+router.post("/nps/pending-results/:pendingId/sync-confirm",                  confirmNpsResultSyncController);
 
 export default router;
