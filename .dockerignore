@@ -1,0 +1,10 @@
+node_modules
+.env
+.env.*
+data/
+frontend/
+docs/
+scripts/
+*.md
+.DS_Store
+.git

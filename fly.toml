@@ -1,0 +1,62 @@
+# Fly.io — ambiente DEV temporário da Secretaria IA
+# Arquitetura: Lovable envia dados via /api/sync/*; backend mantém cache local (JSON DB).
+# O backend NÃO acessa o Supabase do Lovable — integração é 100% por contrato de API.
+# Dados em data/db.json são efêmeros (resetam a cada deploy — aceitável para dev).
+
+app = "iaclin-secretary-dev"
+primary_region = "gru"
+
+[build]
+
+[http_service]
+  internal_port = 3333
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+# Variáveis não-secretas — secrets sensíveis ficam em `flyctl secrets set`
+[env]
+  NODE_ENV        = "production"
+  PORT            = "3333"
+  AI_PROVIDER     = "gemini"
+  GEMINI_MODEL    = "gemini-2.0-flash"
+  DEFAULT_TIMEZONE = "America/Sao_Paulo"
+
+  # Nomes de tabelas e colunas (padrão — só alterar se o Supabase usar nomes diferentes)
+  TABLE_CLINICS            = "clinics"
+  TABLE_AI_CONFIG          = "ai_secretary_config"
+  TABLE_AI_HANDOFF         = "ai_secretary_handoff"
+  TABLE_WHATSAPP_INSTANCES = "whatsapp_instances"
+  TABLE_PATIENTS           = "patients"
+  TABLE_APPOINTMENTS       = "appointments"
+
+  COL_INSTANCE_NAME        = "instance_name"
+  COL_INSTANCE_CLINIC_ID   = "clinic_id"
+  COL_AI_CONFIG_CLINIC_ID  = "clinic_id"
+  COL_AI_CONFIG_PROMPT     = "custom_prompt"
+  COL_PATIENT_CLINIC_ID    = "clinic_id"
+  COL_PATIENT_PHONE        = "phone"
+  COL_APPOINTMENT_CLINIC_ID  = "clinic_id"
+  COL_APPOINTMENT_PATIENT_ID = "patient_id"
+  COL_APPOINTMENT_DATETIME   = "scheduled_at"
+  COL_APPOINTMENT_STATUS     = "status"
+  COL_APPOINTMENT_NOTES      = "notes"
+
+  # ── Secrets a configurar via: flyctl secrets set KEY=VALUE ─────────────────
+  # Obrigatórios:
+  #   GEMINI_API_KEY          → chave do Google AI Studio
+  # Opcionais (Evolution — só se tiver instância pública):
+  #   EVOLUTION_API_URL       → URL pública do Evolution API
+  #   EVOLUTION_API_KEY       → chave do Evolution
+  #   EVOLUTION_WEBHOOK_SECRET
+  # Após o primeiro deploy:
+  #   PUBLIC_BACKEND_URL      → https://<app>.fly.dev
+  #   CORS_EXTRA_ORIGINS      → domínios extras separados por vírgula
+  #
+  # NÃO são necessários: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+  # O backend não acessa Supabase diretamente.

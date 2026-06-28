@@ -1,0 +1,426 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[portuguese]{babel}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{graphicx}
+
+\hypersetup{hidelinks}
+
+% ── Paleta ───────────────────────────────────────────────────────────────────
+\definecolor{primary}{RGB}{22, 82, 168}
+\definecolor{primarydark}{RGB}{15, 55, 120}
+\definecolor{done}{RGB}{22, 130, 62}
+\definecolor{donebg}{RGB}{218, 244, 228}
+\definecolor{todo}{RGB}{120, 125, 140}
+\definecolor{todobg}{RGB}{246, 246, 249}
+\definecolor{rulegray}{RGB}{205, 210, 222}
+\definecolor{subseccolor}{RGB}{50, 75, 130}
+\definecolor{textdark}{RGB}{25, 30, 48}
+\definecolor{stecgray}{RGB}{100, 108, 130}
+
+% ── Checkboxes estilo GitHub ──────────────────────────────────────────────────
+\newcommand{\chdone}{%
+  \begin{tikzpicture}[baseline=-1.8pt]
+    \filldraw[fill=donebg, draw=done, line width=0.75pt, rounded corners=1.5pt]
+      (0,0) rectangle (9pt,9pt);
+    \draw[done, line width=1.1pt, line cap=round, line join=round]
+      (1.8pt,4.2pt) -- (3.8pt,7pt) -- (7.2pt,2pt);
+  \end{tikzpicture}%
+}
+
+\newcommand{\chtodo}{%
+  \begin{tikzpicture}[baseline=-1.8pt]
+    \filldraw[fill=todobg, draw=rulegray, line width=0.75pt, rounded corners=1.5pt]
+      (0,0) rectangle (9pt,9pt);
+  \end{tikzpicture}%
+}
+
+% ── Seções (Sprint) ───────────────────────────────────────────────────────────
+\titleformat{\section}[block]
+  {\large\bfseries\color{primary}}
+  {}
+  {0pt}
+  {\leavevmode{\color{primary}\rule[-0.25em]{3.5pt}{1.15em}}\enspace}
+  [{\color{primary}\vspace{2pt}\rule{\linewidth}{0.6pt}}]
+\titlespacing{\section}{0pt}{1.8em}{0.8em}
+
+\titleformat{\subsection}[block]{\bfseries\color{subseccolor}\small}{}{0em}{}[%
+  {\color{rulegray}\vspace{2pt}\hrule height 0.4pt}\vspace{3pt}]
+\titlespacing{\subsection}{0pt}{1em}{0.3em}
+
+% ── Listas ───────────────────────────────────────────────────────────────────
+\setlist[itemize]{
+  leftmargin = 2em,
+  itemsep    = 3pt,
+  parsep     = 0pt,
+  topsep     = 4pt,
+  label      = {}
+}
+
+% ── Cabeçalho / rodapé ───────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\color{stecgray}\textbf{STEC} \color{rulegray}· IACLIN Roadmap}
+\rhead{\small\color{stecgray} 2026}
+\cfoot{\small\color{rulegray}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{rulegray}\hrule height 0.4pt}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+\color{textdark}
+% ─────────────────────────────────────────────────────────────────────────────
+
+% ── Cabeçalho do documento ───────────────────────────────────────────────────
+\thispagestyle{empty}
+
+\noindent
+% ── Logo: coloque o arquivo da logo na mesma pasta e troque "logo.png" pelo nome correto
+\includegraphics[height=46pt]{logo.png}%
+\hfill{\small\color{stecgray}\bfseries STEC · \the\year}
+
+\vspace{1.8em}
+
+\noindent{\fontsize{32}{36}\selectfont\bfseries\color{primary} IACLIN}
+
+\vspace{0.3em}
+\noindent{\fontsize{15}{18}\selectfont\color{textdark} Roadmap de Desenvolvimento}
+
+\vspace{0.5em}
+{\color{rulegray}\hrule height 1pt}
+\vspace{0.5em}
+
+\noindent{\small\color{stecgray}
+  Documento de acompanhamento das sprints — registra o que já foi entregue
+  e o que ainda está em desenvolvimento até a versão MVP.\quad
+  \textbf{Prazo de entrega: 21 de julho de 2026.}
+}
+
+\vspace{1em}
+\noindent
+\begin{tikzpicture}[baseline=-1.8pt]
+  \filldraw[fill=donebg, draw=done, line width=0.75pt, rounded corners=1.5pt]
+    (0,0) rectangle (9pt,9pt);
+  \draw[done, line width=1.1pt, line cap=round, line join=round]
+    (1.8pt,4.2pt) -- (3.8pt,7pt) -- (7.2pt,2pt);
+\end{tikzpicture}
+\hspace{3pt}{\small\color{done}\bfseries Concluído}
+\hspace{1.8em}
+\begin{tikzpicture}[baseline=-1.8pt]
+  \filldraw[fill=todobg, draw=rulegray, line width=0.75pt, rounded corners=1.5pt]
+    (0,0) rectangle (9pt,9pt);
+\end{tikzpicture}
+\hspace{3pt}{\small\color{todo}\bfseries Em andamento}
+
+\vspace{1.6em}
+{\color{rulegray}\hrule height 0.4pt}
+\vspace{1.2em}
+
+% =============================================================================
+\section{Sprint 1–2 \ · \ Base do Sistema + Agenda}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Pires · Jesus Júnior · Lucas Ferreira}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Workspace / Multi-clínica}
+\begin{itemize}
+  \item[\chdone] Separar espaço pessoal do profissional e espaço da clínica
+  \item[\chdone] Permitir vínculo do profissional com múltiplas clínicas
+  \item[\chdone] Criar opção ``Vincular Clínica'' dentro da plataforma
+  \item[\chdone] Garantir isolamento de dados entre clínica e profissional
+  \item[\chdone] Remover acesso aos dados da clínica após desvinculação
+  \item[\chdone] Sidebar com alternância entre clínicas e espaço pessoal
+\end{itemize}
+
+\subsection{Cadastro / Login}
+\begin{itemize}
+  \item[\chdone] Login e cadastro funcional com prioridade para Google
+  \item[\chdone] Obrigatoriedade de CRM/CRO conforme categoria profissional
+  \item[\chdone] Complementação cadastral após o primeiro acesso
+  \item[\chdone] Separação entre perfil profissional e perfil paciente
+  \item[\chdone] Impedir acesso sem validação mínima dos dados profissionais
+\end{itemize}
+
+\subsection{Agenda}
+\begin{itemize}
+  \item[\chdone] Agenda padrão por dias da semana (horário, intervalo e duração)
+  \item[\chdone] Bloqueio manual de horários
+  \item[\chdone] Status: pendente, confirmado, cancelado e reagendado
+  \item[\chdone] Aprovação manual da consulta pelo profissional
+  \item[\chdone] Consulta solicitada não aparece como confirmada antes da aprovação
+  \item[\chdone] Agenda online pública (ativar/desativar)
+  \item[\chdone] Separação entre agenda pessoal, clínica, operadora e agenda online
+\end{itemize}
+
+\subsection{Pacientes}
+\begin{itemize}
+  \item[\chdone] Cadastro, edição e listagem de pacientes
+  \item[\chdone] Associação de pacientes às consultas
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 3 \ · \ Prontuário}
+\noindent{\small\color{stecgray}\textbf{Responsável:} Jesus Júnior}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Ficha e histórico}
+\begin{itemize}
+  \item[\chdone] Ficha clínica do paciente (criar e editar)
+  \item[\chdone] Histórico de consultas associado ao paciente
+  \item[\chdone] Prontuário vinculado ao contexto correto: clínica ou espaço pessoal
+\end{itemize}
+
+\subsection{Registro de atendimento}
+\begin{itemize}
+  \item[\chdone] Diagnóstico, conduta/evolução, prescrição, encaminhamento e solicitação de exames
+  \item[\chdone] Odontograma básico para fluxo odontológico
+\end{itemize}
+
+\subsection{Documentos}
+\begin{itemize}
+  \item[\chdone] Resumo do atendimento com impressão e exportação em PDF
+  \item[\chdone] PDF com nome do paciente, profissional, clínica e logo
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 4 \ · \ Financeiro}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Ferreira · Ryan Victor}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Controle financeiro básico}
+\begin{itemize}
+  \item[\chdone] Registrar entradas e saídas
+  \item[\chdone] Saldo em caixa visível
+  \item[\chdone] Contas a pagar e a receber
+  \item[\chdone] Registro manual de pagamento
+  \item[\chdone] Separação: financeiro pessoal × financeiro da clínica
+  \item[\chdone] Isolamento financeiro entre clínicas
+\end{itemize}
+
+\subsection{Funil de vendas / Pipeline}
+\begin{itemize}
+  \item[\chdone] Pipeline de orçamentos em formato Kanban
+  \item[\chdone] Status: aprovado, em negociação e perdido
+\end{itemize}
+
+\subsection{Comissionamento de Profissionais}
+\begin{itemize}
+  \item[\chtodo] Regra de comissão por profissional (percentual ou valor fixo)
+  \item[\chtodo] Cálculo de comissão sobre procedimentos realizados no período
+  \item[\chtodo] Relatório de comissão por profissional no painel financeiro
+  \item[\chtodo] Isolamento de comissão por clínica/workspace
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 5 \ · \ Integração com Operadoras}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Pires · Jesus Júnior}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Estrutura da operadora}
+\begin{itemize}
+  \item[\chdone] Painel, autenticação e configuração inicial da operadora
+  \item[\chdone] Estrutura separada para operadora médica e odontológica
+\end{itemize}
+
+\subsection{Rede credenciada}
+\begin{itemize}
+  \item[\chdone] Solicitação de vínculo, aceite e recusa
+  \item[\chdone] Exibição do status do credenciamento
+  \item[\chdone] Listagem de profissionais disponíveis para credenciamento
+  \item[\chtodo] Visualizar profissionais por região e especialidade
+  \item[\chtodo] Visualizar disponibilidade liberada pelo profissional
+\end{itemize}
+
+\subsection{API bidirecional com operadoras — diferencial do produto}
+\begin{itemize}
+  \item[\chtodo] Conexão bidirecional entre o sistema e o portal da operadora via API
+  \item[\chtodo] Sincronização automática da agenda do dentista para a operadora em tempo real
+  \item[\chtodo] Atualização imediata dos procedimentos habilitados pelo plano
+  \item[\chtodo] Configuração de serviços por operadora (manualmente configurável no MVP)
+\end{itemize}
+
+\subsection{Permissões (LGPD)}
+\begin{itemize}
+  \item[\chdone] Operadora visualiza: agenda liberada, disponibilidade, especialidade e vínculo
+  \item[\chdone] Operadora \textbf{não} visualiza: prontuário, exames, diagnóstico e histórico clínico
+  \item[\chdone] Operadora médica vê apenas médicos; odontológica vê apenas dentistas
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 6 \ · \ Credenciamento}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Pires · Jesus Júnior}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Solicitação de vínculo}
+\begin{itemize}
+  \item[\chtodo] Fluxo de solicitação de vínculo com operadora
+  \item[\chtodo] Lista e busca de operadoras (por região e tipo)
+  \item[\chtodo] Seleção de serviços/procedimentos na solicitação
+  \item[\chtodo] Exibir e registrar status da solicitação com data
+\end{itemize}
+
+\subsection{Análise pela operadora}
+\begin{itemize}
+  \item[\chdone] Operadora visualiza solicitação, dados profissionais e especialidade
+  \item[\chdone] Operadora aprova ou recusa com registro da resposta
+\end{itemize}
+
+\subsection{Aceite digital e separação por categoria}
+\begin{itemize}
+  \item[\chtodo] Aceite digital simples com registro de vínculo ativo
+  \item[\chtodo] Estrutura preparada para contrato digital futuro
+  \item[\chtodo] Separação: credenciamento médico × odontológico
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 7 \ · \ Marketplace}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Jesus Júnior · Lucas Ferreira · Ryan Victor}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Busca e filtros}
+\begin{itemize}
+  \item[\chdone] Busca por nome, cidade e especialidade
+  \item[\chdone] Filtro por localização/geolocalização, distância e tipo de atendimento
+  \item[\chdone] Filtro por agenda disponível
+  \item[\chdone] Filtro por convênio
+\end{itemize}
+
+\subsection{Perfil do profissional}
+\begin{itemize}
+  \item[\chdone] Especialidades, localização e disponibilidade conforme agenda
+  \item[\chdone] Exibir apenas dados públicos permitidos
+  \item[\chtodo] Foto do profissional
+  \item[\chtodo] Convênios aceitos exibidos no perfil
+\end{itemize}
+
+\subsection{Agenda online}
+\begin{itemize}
+  \item[\chdone] Exibir apenas profissionais com agenda online ativada
+  \item[\chdone] Solicitação de agendamento com sinalização ``aguardando confirmação''
+  \item[\chdone] Respeitar agenda pessoal, clínica e operadora
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 8 \ · \ Comunicação e Automação}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Pires · Jesus Júnior · Endria Carem}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{WhatsApp}
+\begin{itemize}
+  \item[\chdone] Fluxo de conexão do WhatsApp com a IA Secretária
+  \item[\chtodo] Notificações de consulta aprovada, recusada e reagendada
+  \item[\chtodo] Lembrete manual de consulta
+  \item[\chtodo] Mensagens padrão de confirmação, reagendamento e cancelamento
+\end{itemize}
+
+\subsection{IA Secretária}
+\begin{itemize}
+  \item[\chdone] Prompt base estruturado
+  \item[\chdone] Consultar disponibilidade real da agenda
+  \item[\chdone] Não oferecer horário indisponível
+  \item[\chdone] Encaminhamento para atendimento humano (handoff)
+  \item[\chdone] Responder mensagens de pacientes automaticamente
+  \item[\chtodo] Auxiliar no agendamento perguntando se é particular ou plano
+  \item[\chtodo] Informar serviços, convênios aceitos e localização da clínica
+  \item[\chtodo] Informar status da consulta (inclusive quando aguarda aprovação)
+  \item[\chtodo] Respeitar agenda de plano/operadora
+\end{itemize}
+
+\subsection{IA Gestor}
+\begin{itemize}
+  \item[\chdone] Chat interno disponível para clínica e profissional autônomo
+  \item[\chdone] Responder sobre consultas do dia, próximas, pendentes e canceladas
+  \item[\chdone] Responder sobre horários disponíveis e volume de atendimentos
+  \item[\chdone] Base preparada para análise financeira futura
+\end{itemize}
+
+\subsection{Automações}
+\begin{itemize}
+  \item[\chdone] Estrutura de automações (criar, editar e ativar regras de disparo)
+  \item[\chtodo] Fluxo de lembrete de consulta (24h antes)
+  \item[\chtodo] Fluxo de confirmação automática
+  \item[\chtodo] Fluxo de reagendamento
+  \item[\chtodo] Fluxo de retorno do paciente
+\end{itemize}
+
+\subsection{Campanhas de WhatsApp}
+\begin{itemize}
+  \item[\chtodo] Envio em massa de mensagens via WhatsApp
+  \item[\chtodo] Template de mensagem personalizável por campanha
+  \item[\chtodo] Filtrar base de pacientes para envio (todos, por status, por período)
+  \item[\chtodo] Relatório básico de envio (enviados / falhos)
+\end{itemize}
+
+\subsection{Régua de Relacionamento}
+\begin{itemize}
+  \item[\chtodo] Mensagem automática de aniversário para o paciente
+  \item[\chtodo] Lembrete de retorno preventivo (ex: ``Faz 6 meses desde sua limpeza'')
+  \item[\chtodo] Pesquisa de satisfação (NPS) automática pós-consulta
+  \item[\chtodo] Gatilhos por data de aniversário, última consulta e consulta realizada
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 9 \ · \ Finalização e Deploy}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Pires · Jesus Júnior · Lucas Ferreira · Ryan Victor}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Cobrança de Assinaturas (Stripe)}
+\begin{itemize}
+  \item[\chtodo] Planos de assinatura no Stripe (Clínica / Profissional Autônomo)
+  \item[\chtodo] Checkout de assinatura integrado
+  \item[\chtodo] Status da assinatura ativa visível no painel
+  \item[\chtodo] Bloqueio de acesso em caso de assinatura vencida ou cancelada
+  \item[\chtodo] Upgrade, downgrade e cancelamento de plano
+  \item[\chtodo] Webhook do Stripe para atualizar status em tempo real
+\end{itemize}
+
+\subsection{Validação final e QA}
+\begin{itemize}
+  \item[\chtodo] Validar agenda, marketplace, operadoras e fluxos de IA
+  \item[\chtodo] Garantir que dados clínicos não fiquem expostos
+  \item[\chtodo] Responsividade mobile e ajustes visuais finais
+  \item[\chtodo] Revisar e corrigir bugs críticos restantes
+\end{itemize}
+
+\subsection{Deploy}
+\begin{itemize}
+  \item[\chtodo] Deploy do sistema em ambiente online
+  \item[\chtodo] Validar ausência de erros críticos em produção
+\end{itemize}
+
+% =============================================================================
+\section{Sprint 10 \ · \ Especialidades}
+\noindent{\small\color{stecgray}\textbf{Responsáveis:} Lucas Pires · Jesus Júnior · Lucas Ferreira}\par\vspace{0.5em}
+% =============================================================================
+
+\subsection{Estrutura padrão reutilizável}
+\begin{itemize}
+  \item[\chtodo] Validar fluxo padrão reutilizável entre especialidades
+  \item[\chtodo] Identificar campos realmente específicos de cada área
+  \item[\chtodo] Odontologia: validar odontograma básico e fluxo específico
+\end{itemize}
+
+\subsection{Especialidades médicas}
+\begin{itemize}
+  \item[\chtodo] Validar necessidades específicas: pediatria, psicologia, ortopedia, dermatologia e cardiologia
+  \item[\chtodo] Identificar quais especialidades precisam de telas próprias no MVP
+\end{itemize}
+
+% ── Rodapé do documento ───────────────────────────────────────────────────────
+\vspace{2em}
+{\color{rulegray}\hrule height 0.4pt}
+\vspace{0.6em}
+\noindent{\small\color{stecgray}
+  \textbf{STEC} · Documento de uso interno e apresentação ao cliente · \the\year
+}
+
+\end{document}

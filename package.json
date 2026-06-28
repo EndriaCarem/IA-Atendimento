@@ -1,0 +1,37 @@
+{
+  "name": "ia-atendimento",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "node --test",
+    "dev": "nodemon --ignore 'data/*.json' src/server.js",
+    "dev:front": "npm --prefix frontend run dev",
+    "start": "node src/server.js",
+    "build:front": "npm --prefix frontend run build",
+    "check:gemini": "node scripts/check-gemini.js",
+    "check:ollama": "node scripts/check-ollama.js",
+    "check:evolution": "node scripts/evolution-healthcheck.js",
+    "onboard:clinic": "node scripts/evolution-onboarding.js",
+    "bind:instance": "node scripts/bind-instance-clinic.js",
+    "schema:apply": "node scripts/apply-supabase-schema.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "nodemon": "^3.1.14",
+    "pino-pretty": "^13.1.3"
+  },
+  "type": "module"
+}
