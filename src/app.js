@@ -3,6 +3,8 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import { logger } from "./lib/logger.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
+import { apiAuthMiddleware } from "./middleware/api-auth.js";
+import { rateLimitMiddleware } from "./middleware/rate-limit.js";
 import healthRoutes from "./routes/health.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
 import whatsappRoutes from "./routes/whatsapp.routes.js";
@@ -52,7 +54,7 @@ app.use(cors({
     callback(new Error(`Origin not allowed by CORS: ${origin}`));
   },
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "bypass-tunnel-reminder"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "x-backend-token", "bypass-tunnel-reminder"],
 }));
 
 app.use(
@@ -78,13 +80,14 @@ app.use(
 // webhook falho, desestabilizando a conexão. WhatsApp aceita mídia até ~16MB,
 // que em base64 chega a ~22MB — por isso 25mb de folga.
 app.use(express.json({ limit: "25mb" }));
+app.use(rateLimitMiddleware);
 
 app.use("/health", healthRoutes);
 app.use("/webhooks", webhookRoutes);
-app.use("/api", whatsappRoutes);
-app.use("/api", dataRoutes);
-app.use("/api", clinicAiRoutes);
-app.use("/api", syncRoutes);
+app.use("/api", apiAuthMiddleware, whatsappRoutes);
+app.use("/api", apiAuthMiddleware, dataRoutes);
+app.use("/api", apiAuthMiddleware, clinicAiRoutes);
+app.use("/api", apiAuthMiddleware, syncRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

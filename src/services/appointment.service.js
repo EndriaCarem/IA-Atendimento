@@ -202,7 +202,7 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
         clinicId,
         patientId: patient.id,
         scheduledAt,
-        status: "rescheduled",
+        status: "pending_approval",
         notes
       });
 
@@ -217,7 +217,7 @@ export async function applyAppointmentAction({ clinicId, patient, phone, aiResul
       appointmentId: current.id,
       clinicId,
       scheduledAt,
-      status: "rescheduled",
+      status: "pending_approval",
       notes
     });
 

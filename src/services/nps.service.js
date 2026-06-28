@@ -210,13 +210,24 @@ export function listNpsPendingResults(clinicId) {
       r.clinic_id === clinicId &&
       r.status === "answered" &&
       r.sync_status === "pending"
-  );
+  ).map((r) => {
+    const patient = r.patient_id
+      ? dbFindOne("patients", (p) => p.id === r.patient_id)
+      : dbFindOne("patients", (p) => p.clinic_id === clinicId && p.phone === r.patient_phone);
+    const apt = r.appointment_id
+      ? dbFindOne("synced_appointments", (a) => a.id === r.appointment_id)
+      : null;
+    return {
+      ...r,
+      patient_name: patient?.full_name ?? patient?.name ?? apt?.patient_name ?? null,
+    };
+  });
 }
 
 export function markNpsResultSynced(clinicId, pendingId, supabaseId) {
   const record = dbUpdate(
     "nps_responses",
-    (r) => r.id === pendingId && r.clinic_id === clinicId,
+    (r) => r.id === pendingId && (!clinicId || r.clinic_id === clinicId),
     { sync_status: "synced", supabase_id: supabaseId ?? null }
   );
   return record;

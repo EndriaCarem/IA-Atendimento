@@ -14,7 +14,7 @@ export function syncNpsSurveysController(req, res, next) {
     }
     const count = replaceNpsSurveys(clinic_id, surveys ?? []);
     logger.info({ clinicId: clinic_id, count }, "[NPS] Questionários sincronizados");
-    res.json({ ok: true, synced: count });
+    res.json({ ok: true, success: true, synced: count });
   } catch (err) {
     next(err);
   }
@@ -23,9 +23,12 @@ export function syncNpsSurveysController(req, res, next) {
 // GET /api/clinics/:clinicId/nps/pending-results — respostas captadas, a gravar no Supabase
 export function listNpsPendingResultsController(req, res, next) {
   try {
-    const { clinicId } = req.params;
+    const clinicId = req.params.clinicId ?? req.query.clinic_id;
+    if (!clinicId) {
+      return res.status(400).json({ ok: false, error: "clinic_id é obrigatório" });
+    }
     const data = listNpsPendingResults(clinicId);
-    res.json({ ok: true, data });
+    res.json({ ok: true, success: true, data });
   } catch (err) {
     next(err);
   }
@@ -34,13 +37,14 @@ export function listNpsPendingResultsController(req, res, next) {
 // POST /api/clinics/:clinicId/nps/pending-results/:pendingId/sync-confirm
 export function confirmNpsResultSyncController(req, res, next) {
   try {
-    const { clinicId, pendingId } = req.params;
+    const clinicId = req.params.clinicId ?? req.query.clinic_id;
+    const { pendingId } = req.params;
     const { supabase_id } = req.body ?? {};
     const record = markNpsResultSynced(clinicId, pendingId, supabase_id);
     if (!record) {
       return res.status(404).json({ ok: false, error: "Resposta NPS não encontrada" });
     }
-    res.json({ ok: true });
+    res.json({ ok: true, success: true });
   } catch (err) {
     next(err);
   }

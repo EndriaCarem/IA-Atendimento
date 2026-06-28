@@ -6,15 +6,21 @@
  *  - reschedule:   status passou para "cancelled"
  */
 
-import { dbFind } from "../lib/json-db.js";
+import { dbFind, dbFindOne } from "../lib/json-db.js";
 import { dispatchAutomationMessage } from "./automation-sender.service.js";
 import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
 
 // Monta "consulta de <procedimento> de <dia-da-semana DD/MM> às <HH:mm>" com o
 // fuso da clínica, para a mensagem de cancelamento ser específica.
-function buildCancelDetail(apt) {
-  const tz = env.DEFAULT_TIMEZONE;
+function getClinicTimezone(clinicId) {
+  const clinic = dbFindOne("clinics", (c) => c.id === clinicId);
+  const config = dbFindOne("clinic_config", (c) => c.clinic_id === clinicId);
+  return clinic?.timezone ?? clinic?.time_zone ?? config?.timezone ?? config?.time_zone ?? env.DEFAULT_TIMEZONE;
+}
+
+function buildCancelDetail(apt, timezone = env.DEFAULT_TIMEZONE) {
+  const tz = timezone;
   const proc = apt.procedure ? `consulta de ${apt.procedure}` : "consulta";
   if (!apt.start_time) return proc;
   try {
@@ -24,6 +30,19 @@ function buildCancelDetail(apt) {
     return `${proc} de ${data} às ${hora}`;
   } catch {
     return proc;
+  }
+}
+
+function buildDateTimeDetail(apt, timezone = env.DEFAULT_TIMEZONE) {
+  const tz = timezone;
+  if (!apt.start_time) return null;
+  try {
+    const d = new Date(apt.start_time);
+    const data = new Intl.DateTimeFormat("pt-BR", { timeZone: tz, weekday: "long", day: "2-digit", month: "2-digit" }).format(d);
+    const hora = new Intl.DateTimeFormat("pt-BR", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(d);
+    return `${data} às ${hora}`;
+  } catch {
+    return null;
   }
 }
 
@@ -44,9 +63,11 @@ function getActiveAutomation(clinicId, type) {
  * @param {string|null} params.prevStatus - status antes do upsert
  * @param {object} params.apt - registro normalizado (com patient_phone etc.)
  */
-export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt }) {
+export async function handleAppointmentStatusChange({ clinicId, prevStatus, prevStartTime = null, apt }) {
   const newStatus = apt.status;
-  if (prevStatus === newStatus) return; // nada mudou
+  const timezone = getClinicTimezone(clinicId);
+  const startChanged = Boolean(prevStartTime && apt.start_time && prevStartTime !== apt.start_time);
+  if (prevStatus === newStatus && !startChanged) return; // nada mudou
 
   const context = {
     patient_name: apt.patient_name,
@@ -65,9 +86,25 @@ export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt 
       // intencionalmente sem ação — ver comentário acima.
     }
 
+    if (startChanged && ["scheduled", "confirmed", "confirmada"].includes(newStatus)) {
+      const when = buildDateTimeDetail(apt, timezone);
+      const proc = apt.procedure ? ` de ${apt.procedure}` : "";
+      const template = when
+        ? `Olá {patient_name}! Sua consulta${proc} foi remarcada para ${when}.`
+        : `Olá {patient_name}! Sua consulta${proc} foi remarcada.`;
+      await dispatchAutomationMessage({
+        clinicId,
+        type: "reschedule",
+        dedupeKey: `reschedule-date:${apt.id}:${apt.start_time}`,
+        template,
+        phone: apt.patient_phone,
+        context,
+      });
+    }
+
     // Rejeição de agendamento pendente
     if (newStatus === "rejected") {
-      const detalhe = buildCancelDetail(apt);
+      const detalhe = buildCancelDetail(apt, timezone);
       const defaultMsg = detalhe
         ? `Olá {patient_name}, infelizmente não conseguimos agendar sua ${detalhe} no momento. Por favor, tente novamente mais tarde ou entre em contato conosco. Desculpe o transtorno! 🙏`
         : "Olá {patient_name}, infelizmente não conseguimos confirmar seu agendamento no momento. Por favor, tente novamente mais tarde ou entre em contato conosco.";
@@ -91,7 +128,7 @@ export async function handleAppointmentStatusChange({ clinicId, prevStatus, apt 
         // Mensagem montada pelo backend COM os detalhes da consulta (data/hora/
         // procedimento), para o paciente saber exatamente o que foi cancelado.
         // Usa as variáveis renderizadas pelo dispatch — não depende do dono.
-        const detalhe = buildCancelDetail(apt);
+        const detalhe = buildCancelDetail(apt, timezone);
         const template = detalhe
           ? `Olá {patient_name}! Infelizmente precisamos cancelar sua ${detalhe}. Pedimos desculpas pelo transtorno. 🙏 Se quiser, me diga que te ajudo a reagendar para uma nova data.`
           : automation.message_template;

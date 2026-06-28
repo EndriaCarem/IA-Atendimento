@@ -7,7 +7,7 @@ import { applyAppointmentAction } from "./appointment.service.js";
 import { captureNpsAnswer } from "./nps.service.js";
 import { resolvePatientContext, resolveTenantContext } from "./context-resolver.service.js";
 import { broadcastToClinic } from "../lib/sse-hub.js";
-import { dbFindOne, dbFind } from "../lib/json-db.js";
+import { dbFindOne, dbFind, dbUpsert } from "../lib/json-db.js";
 import {
   getConversationState,
   setConversationState,
@@ -279,13 +279,56 @@ export async function processIncomingPatientMessage(incomingMessage) {
     const convState = getConversationState(tenant.clinicId, phoneDigits);
     const stateContext = buildStateContext(convState);
 
-    const forcedHandoff = shouldForceConfiguredHandoff(tenant, incomingMessage.text)
-      ? buildConfiguredHandoffResult(tenant, "CONFIGURED_TRIGGER")
-      : null;
+    if (shouldForceConfiguredHandoff(tenant, incomingMessage.text)) {
+      const convId = Buffer.from(`${tenant.clinicId}:${phoneDigits}`).toString("base64url");
+      dbUpsert(
+        "conversation_takeovers",
+        {
+          id: `${tenant.clinicId}:${phoneDigits}`,
+          clinic_id: tenant.clinicId,
+          phone: phoneDigits,
+          conv_id: convId,
+          active: true,
+          reason: "CONFIGURED_TRIGGER",
+          taken_over_at: new Date().toISOString(),
+        },
+        "id"
+      );
+      setConversationState(tenant.clinicId, phoneDigits, CONV_STATES.HANDOFF, {});
+      await insertWhatsAppMessage({
+        clinicId: tenant.clinicId,
+        patientPhone: phoneDigits,
+        patientName: patient?.name ?? null,
+        direction: "inbound",
+        text: incomingMessage.text,
+        instanceName: tenant.instanceName,
+        externalMessageId: incomingMessage.messageId,
+        intent: "handoff",
+        aiHandled: false,
+        handoffRequested: true,
+        metadata: { source: "evolution_webhook", handoff_reason: "CONFIGURED_TRIGGER" }
+      });
+      broadcastToClinic(tenant.clinicId, "messages:new", {
+        direction: "inbound",
+        phone: phoneDigits,
+        patient_name: patient?.name ?? null,
+        text: incomingMessage.text,
+        intent: "handoff",
+        at: new Date().toISOString(),
+      });
+      broadcastToClinic(tenant.clinicId, "handoff:changed", {
+        phone: phoneDigits,
+        active: true,
+        reason: "CONFIGURED_TRIGGER",
+        at: new Date().toISOString(),
+      });
+      logger.info({ clinicId: tenant.clinicId, phone: phoneDigits }, "[HANDOFF] Palavra-chave ativou takeover; IA nao respondeu");
+      return { skipped: true, reason: "HANDOFF_TRIGGERED" };
+    }
 
     let rawAiResult;
     try {
-      rawAiResult = forcedHandoff || await runClinicConversation({
+      rawAiResult = await runClinicConversation({
         clinicContext: tenant,
         patientContext: patient,
         patientMessage: incomingMessage.text,

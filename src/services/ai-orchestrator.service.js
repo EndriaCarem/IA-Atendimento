@@ -90,7 +90,7 @@ function normalizeBusinessHours(businessHours) {
   }, {});
 }
 
-function getCurrentBusinessHoursStatus(businessHours) {
+function getCurrentBusinessHoursStatus(businessHours, timezone = env.DEFAULT_TIMEZONE) {
   const normalized = normalizeBusinessHours(businessHours);
 
   if (!normalized) {
@@ -98,7 +98,7 @@ function getCurrentBusinessHoursStatus(businessHours) {
   }
 
   const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: env.DEFAULT_TIMEZONE,
+    timeZone: timezone,
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
@@ -133,7 +133,7 @@ function getCurrentBusinessHoursStatus(businessHours) {
   };
 }
 
-function buildBusinessHoursContext(businessHours) {
+function buildBusinessHoursContext(businessHours, timezone = env.DEFAULT_TIMEZONE) {
   const normalized = normalizeBusinessHours(businessHours);
 
   if (!normalized || Object.keys(normalized).length === 0) {
@@ -150,9 +150,9 @@ function buildBusinessHoursContext(businessHours) {
     return `- ${label}: ${schedule.open} as ${schedule.close}`;
   });
 
-  const currentStatus = getCurrentBusinessHoursStatus(normalized);
+  const currentStatus = getCurrentBusinessHoursStatus(normalized, timezone);
   const statusLine = currentStatus
-    ? `Status atual da clinica no fuso ${env.DEFAULT_TIMEZONE}: ${currentStatus.isOpen ? "aberta" : "fora do expediente"} (${weekdayLabels[currentStatus.weekdayKey]} ${currentStatus.currentTime}).`
+    ? `Status atual da clinica no fuso ${timezone}: ${currentStatus.isOpen ? "aberta" : "fora do expediente"} (${weekdayLabels[currentStatus.weekdayKey]} ${currentStatus.currentTime}).`
     : null;
 
   return [
@@ -191,9 +191,17 @@ function buildHandoffContext(handoff) {
 
 function buildProceduresContext(procedures) {
   if (!Array.isArray(procedures) || procedures.length === 0) return null;
-  const lines = procedures.map((p) => `- ${p.name}${p.duration_min ? ` (${p.duration_min} min)` : ""}`);
+  const lines = procedures.map((p) => {
+    const duration = p.duration_min ?? p.duration_minutes ?? p.duration ?? null;
+    const rawPrice = p.price ?? p.value ?? p.amount ?? p.private_price ?? null;
+    const numericPrice = Number(rawPrice);
+    const price = rawPrice !== null && rawPrice !== undefined && rawPrice !== "" && Number.isFinite(numericPrice)
+      ? ` — preco: R$ ${numericPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : "";
+    return `- ${p.name}${duration ? ` (${duration} min)` : ""}${price}`;
+  });
   return [
-    "Procedimentos disponiveis (USO INTERNO - nao liste todos para o paciente; use apenas para reconhecer/confirmar o que ele pedir, ou sugerir no maximo 2-3 se ele nao souber):",
+    "Procedimentos disponiveis (USO INTERNO - nao liste todos para o paciente; use apenas para reconhecer/confirmar o que ele pedir, sugerir no maximo 2-3 se ele nao souber, ou responder preco quando houver preco informado):",
     ...lines,
   ].join("\n");
 }
@@ -238,7 +246,7 @@ function buildBookingLinkContext(bookingLink) {
   return `Link de agendamento online: ${bookingLink}. Voce pode compartilhar este link se o paciente preferir agendar sozinho.`;
 }
 
-function buildFreeSlotsContext(clinicId, durationMin = 60) {
+function buildFreeSlotsContext(clinicId, durationMin = 60, timezone = env.DEFAULT_TIMEZONE) {
   const slots = [];
   const now = new Date();
 
@@ -261,7 +269,7 @@ function buildFreeSlotsContext(clinicId, durationMin = 60) {
   }
 
   const formatter = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: env.DEFAULT_TIMEZONE,
+    timeZone: timezone,
     weekday: "long",
     day: "2-digit",
     month: "2-digit",
@@ -271,7 +279,7 @@ function buildFreeSlotsContext(clinicId, durationMin = 60) {
     const label = formatter.format(new Date(`${date}T12:00:00`));
     const times = daySlots.map((s) => {
       const t = new Date(s.start);
-      return t.toLocaleTimeString("pt-BR", { timeZone: env.DEFAULT_TIMEZONE, hour: "2-digit", minute: "2-digit" });
+      return t.toLocaleTimeString("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" });
     }).join(", ");
     return `- ${label}: ${times}`;
   });
@@ -309,7 +317,7 @@ function extractCustomGreeting(customPrompt) {
   return greeting || null;
 }
 
-function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPrompt, businessHours, handoff, procedures, insurancePlans, doctors, freeSlotsContext, conversationHistory, stateContext, isKnownPatient = false, knownPatientName = null }) {
+function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPrompt, businessHours, handoff, procedures, insurancePlans, doctors, freeSlotsContext, conversationHistory, stateContext, isKnownPatient = false, knownPatientName = null, timezone = env.DEFAULT_TIMEZONE }) {
   const customGreeting = extractCustomGreeting(customPrompt);
   // Se houver saudação configurada, ela define o nome/identidade — tem prioridade
   // sobre o clinicName do banco (que pode estar desatualizado).
@@ -340,7 +348,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
     ? `PACIENTE JA CADASTRADO: este numero ja tem cadastro em nome de ${knownPatientName}. Trate pelo primeiro nome no atendimento geral. POREM, ao AGENDAR uma consulta, confirme UMA vez para quem e: pergunte de forma natural "A consulta e para voce mesmo, ${knownPatientName}, ou para outra pessoa?". Se for para ${knownPatientName}, use esse nome (NAO peca de novo). Se for para OUTRA pessoa, peca APENAS o nome dela e use esse nome no agendamento (patient_name = nome informado). Faca essa confirmacao so na hora de agendar, nao em duvidas simples.`
     : "PACIENTE NOVO (sem cadastro): so faca cadastro SE o paciente quiser AGENDAR (se ele so tira duvida, responda sem pedir dados). Para cadastrar voce precisa de TRES dados, perguntados UM POR VEZ (nunca dois na mesma mensagem): (1) NOME completo — ex: 'Para agendar, qual e o seu nome?'; (2) DEPOIS do nome, DATA DE NASCIMENTO — ex: 'Obrigado! Qual a sua data de nascimento?'; (3) DEPOIS, o CPF — ex: 'Por fim, qual o seu CPF?'. O telefone vem automatico, NAO peca. Quando tiver os tres, ao criar o agendamento preencha appointment_action com patient_name, date_of_birth (YYYY-MM-DD; converta '15/03/1990' para '1990-03-15') e cpf (so os digitos). NAO peca e-mail. NAO repita pergunta ja respondida.";
   const addressContext = clinicAddress ? `Endereco da clinica: ${clinicAddress}. Informe este endereco quando o paciente pedir a localizacao.` : null;
-  const businessHoursContext = buildBusinessHoursContext(businessHours);
+  const businessHoursContext = buildBusinessHoursContext(businessHours, timezone);
   const handoffContext = buildHandoffContext(handoff);
   const proceduresContext = buildProceduresContext(procedures);
   const insuranceContext = buildInsurancePlansContext(insurancePlans);
@@ -369,6 +377,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
     "NUNCA explique conceitos nem de aulas (ex: nao explique 'o que e sexta-feira'). Se o paciente perguntar 'qual dia?' ou 'que dia da semana?', ele quer saber as DATAS disponiveis — responda listando as datas reais (dia-da-semana DD/MM), nao o significado das palavras.",
     "Voce NAO e um chatbot generico. Sua unica funcao e conduzir o paciente pelo fluxo: agendamento, reagendamento, cancelamento ou tirar duvidas basicas. Nunca faca diagnostico.",
     "Assim que identificar o paciente, use sempre o primeiro nome dele nas respostas.",
+    "EMERGENCIA/URGENCIA MEDICA (REGRA ABSOLUTA): se o paciente disser que esta passando mal, infarto, falta de ar, desmaio, dor no peito, sangramento intenso, acidente, risco de morte, ou qualquer emergencia/urgencia medica, responda exatamente: 'Sinto muito que voce esteja passando por isso. Em caso de urgencia ou emergencia, ligue para o SAMU 192 ou procure o pronto atendimento mais proximo agora.' Nao tente agendar consulta, nao faca triagem e nao peca dados.",
     "Se o paciente perguntar algo medico (sintoma, diagnostico, remedio, tratamento), responda exatamente: 'Para duvidas medicas, o profissional respondera na consulta.' e siga ajudando com agendamento.",
     clinicDescriptor,
     stateContext,
@@ -385,6 +394,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
     "6. Apos registrar um pedido de agendamento, informe ao paciente que a consulta ficou AGUARDANDO CONFIRMACAO da clinica e que ele recebera um aviso assim que for aprovada. Nao garanta que ja esta confirmada.",
     "7. Voce NAO tem acesso a prontuario, diagnostico, exames ou historico clinico. Se perguntarem, diga que essas informacoes so podem ser tratadas diretamente com o profissional na consulta.",
     "8. Ao listar servicos/procedimentos: copie os nomes EXATAMENTE como aparecem na secao 'Procedimentos oferecidos pela clinica' abaixo, sem traduzir, resumir, parafrasear ou inventar. Se o nome real e 'Profilaxia (Limpeza)', escreva 'Profilaxia (Limpeza)', nunca 'Limpeza Dental'. Formato WhatsApp: frase curta de introducao + cada procedimento numa linha com '• *<nome exato>*'. Mostre ate 8; se houver mais, diga 'e mais X procedimentos' e ofereca listar o restante.",
+    "9. PRECO: se o paciente perguntar preco/valor de um procedimento e houver preco informado no procedimento, responda com o valor exato do contexto. Se nao houver preco configurado, diga que a equipe confirma o valor pelo atendimento da clinica; nao invente valores.",
     addressContext,
     businessHoursContext,
     freeSlotsContext,
@@ -484,12 +494,13 @@ export async function runClinicConversation({
   recentMessages = [],
   stateContext = null
 }) {
-  const freeSlotsContext = buildFreeSlotsContext(clinicContext.clinicId ?? clinicContext.clinic_id);
+  const timezone = clinicContext.timezone ?? clinicContext.time_zone ?? env.DEFAULT_TIMEZONE;
+  const freeSlotsContext = buildFreeSlotsContext(clinicContext.clinicId ?? clinicContext.clinic_id, 60, timezone);
   const conversationHistory = buildConversationHistoryContext(recentMessages);
   // Paciente já cadastrado tem nome; novo vem sem. Usado para a regra de cadastro.
   const isKnownPatient = Boolean(patientContext?.name);
   const knownPatientName = patientContext?.name ?? null;
-  const systemPrompt = buildSystemPrompt({ ...clinicContext, freeSlotsContext, conversationHistory, stateContext, isKnownPatient, knownPatientName });
+  const systemPrompt = buildSystemPrompt({ ...clinicContext, timezone, freeSlotsContext, conversationHistory, stateContext, isKnownPatient, knownPatientName });
 
   const userPayload = {
     patient: {
@@ -498,7 +509,7 @@ export async function runClinicConversation({
       phone: patientContext?.phone ?? patientPhone
     },
     inbound_message: patientMessage,
-    timezone: env.DEFAULT_TIMEZONE,
+    timezone,
     now_iso: new Date().toISOString()
   };
 
