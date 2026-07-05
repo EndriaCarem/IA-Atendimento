@@ -11,6 +11,7 @@ import whatsappRoutes from "./routes/whatsapp.routes.js";
 import dataRoutes from "./routes/data.routes.js";
 import clinicAiRoutes from "./routes/clinic-ai.routes.js";
 import syncRoutes from "./routes/sync.routes.js";
+import campaignsRoutes from "./routes/campaigns.routes.js";
 
 export const app = express();
 
@@ -88,6 +89,7 @@ app.use("/api", apiAuthMiddleware, whatsappRoutes);
 app.use("/api", apiAuthMiddleware, dataRoutes);
 app.use("/api", apiAuthMiddleware, clinicAiRoutes);
 app.use("/api", apiAuthMiddleware, syncRoutes);
+app.use("/api", apiAuthMiddleware, campaignsRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

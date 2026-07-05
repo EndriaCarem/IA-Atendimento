@@ -1,0 +1,243 @@
+import { dbFind, dbFindOne, dbInsert, dbUpdate } from "../lib/json-db.js";
+import { randomUUID } from "crypto";
+import { logger } from "../lib/logger.js";
+
+export function createCampaign(clinicId, payload) {
+  const {
+    name,
+    description,
+    template,
+    channels = ["whatsapp"],
+    filters = {},
+    scheduled_for = null,
+    timezone = "America/Sao_Paulo",
+  } = payload;
+
+  if (!template || template.trim().length === 0) {
+    throw new Error("Template obrigatório");
+  }
+
+  if (!Array.isArray(channels) || channels.length === 0) {
+    throw new Error("Mínimo 1 canal (whatsapp ou sms)");
+  }
+
+  const validChannels = ["whatsapp", "sms"];
+  if (!channels.every((c) => validChannels.includes(c))) {
+    throw new Error(`Canais válidos: ${validChannels.join(", ")}`);
+  }
+
+  const campaign = {
+    id: randomUUID(),
+    clinic_id: clinicId,
+    name: name ?? "Sem nome",
+    description: description ?? null,
+    template,
+    channels,
+    filters: {
+      patient_type: filters.patient_type ?? "all",
+      last_visit_days: filters.last_visit_days ?? null,
+      procedures: filters.procedures ?? null,
+      insurance_plan: filters.insurance_plan ?? null,
+    },
+    scheduled_for,
+    timezone,
+    status: "draft",
+    created_at: new Date().toISOString(),
+    started_at: null,
+    completed_at: null,
+    stats: {
+      total_recipients: 0,
+      sent_whatsapp: 0,
+      sent_sms: 0,
+      failed_whatsapp: 0,
+      failed_sms: 0,
+      bounced: 0,
+    },
+  };
+
+  dbInsert("campaigns", campaign);
+  logger.info({ clinicId, campaignId: campaign.id }, "[CAMPAIGN] Criada");
+  return campaign;
+}
+
+export function listCampaigns(clinicId, filters = {}) {
+  const { status = null } = filters;
+
+  let records = dbFind("campaigns", (c) => c.clinic_id === clinicId);
+
+  if (status) {
+    records = records.filter((c) => c.status === status);
+  }
+
+  return records.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+export function getCampaignById(campaignId, clinicId) {
+  return dbFindOne("campaigns", (c) => c.id === campaignId && c.clinic_id === clinicId);
+}
+
+export function updateCampaign(campaignId, clinicId, payload) {
+  const campaign = getCampaignById(campaignId, clinicId);
+
+  if (!campaign) {
+    throw new Error("Campanha não encontrada");
+  }
+
+  if (campaign.status !== "draft") {
+    throw new Error(`Não pode editar campanha em status ${campaign.status}`);
+  }
+
+  const updates = {};
+  if (payload.name !== undefined) updates.name = payload.name;
+  if (payload.description !== undefined) updates.description = payload.description;
+  if (payload.template !== undefined) updates.template = payload.template;
+  if (payload.channels !== undefined) updates.channels = payload.channels;
+  if (payload.filters !== undefined) updates.filters = payload.filters;
+  if (payload.scheduled_for !== undefined) updates.scheduled_for = payload.scheduled_for;
+
+  dbUpdate("campaigns", (c) => c.id === campaignId, updates);
+
+  logger.info({ clinicId, campaignId }, "[CAMPAIGN] Atualizada");
+  return { ...campaign, ...updates };
+}
+
+export function deleteCampaign(campaignId, clinicId) {
+  const campaign = getCampaignById(campaignId, clinicId);
+
+  if (!campaign) {
+    throw new Error("Campanha não encontrada");
+  }
+
+  if (campaign.status !== "draft") {
+    throw new Error(`Não pode deletar campanha em status ${campaign.status}`);
+  }
+
+  logger.info({ clinicId, campaignId }, "[CAMPAIGN] Deletada");
+}
+
+export function getFilteredPatients(clinicId, filters) {
+  let patients = dbFind("patients", (p) => p.clinic_id === clinicId);
+
+  if (filters.patient_type === "returning") {
+    patients = patients.filter((p) => {
+      const apts = dbFind(
+        "synced_appointments",
+        (a) =>
+          a.patient_id === p.id &&
+          ["completed", "realizada", "confirmed", "confirmada"].includes(a.status)
+      );
+      return apts.length > 0;
+    });
+  }
+
+  if (filters.patient_type === "new") {
+    patients = patients.filter((p) => {
+      const apts = dbFind(
+        "synced_appointments",
+        (a) =>
+          a.patient_id === p.id &&
+          ["completed", "realizada", "confirmed", "confirmada"].includes(a.status)
+      );
+      return apts.length === 0;
+    });
+  }
+
+  if (filters.last_visit_days) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - filters.last_visit_days);
+
+    patients = patients.filter((p) => {
+      const apts = dbFind("synced_appointments", (a) => a.patient_id === p.id && new Date(a.start_time) >= cutoffDate);
+      return apts.length > 0;
+    });
+  }
+
+  if (filters.procedures && Array.isArray(filters.procedures)) {
+    patients = patients.filter((p) => {
+      const apts = dbFind("synced_appointments", (a) => a.patient_id === p.id && filters.procedures.includes(a.procedure));
+      return apts.length > 0;
+    });
+  }
+
+  if (filters.insurance_plan) {
+    patients = patients.filter((p) => {
+      const apts = dbFind("synced_appointments", (a) => a.patient_id === p.id && a.insurance_plan === filters.insurance_plan);
+      return apts.length > 0;
+    });
+  }
+
+  return patients;
+}
+
+export function previewCampaign(campaignId, clinicId) {
+  const campaign = getCampaignById(campaignId, clinicId);
+
+  if (!campaign) {
+    throw new Error("Campanha não encontrada");
+  }
+
+  const patients = getFilteredPatients(clinicId, campaign.filters);
+
+  return {
+    campaign_name: campaign.name,
+    channels: campaign.channels,
+    filters_applied: campaign.filters,
+    total_recipients: patients.length,
+    sample_recipients: patients.slice(0, 5).map((p) => ({
+      patient_id: p.id,
+      name: p.name,
+      phone: p.phone,
+    })),
+  };
+}
+
+export function prepareCampaignForSend(campaignId, clinicId) {
+  const campaign = getCampaignById(campaignId, clinicId);
+
+  if (!campaign) {
+    throw new Error("Campanha não encontrada");
+  }
+
+  if (campaign.status !== "draft") {
+    throw new Error("Campanha deve estar em draft para preparar envio");
+  }
+
+  const patients = getFilteredPatients(clinicId, campaign.filters);
+
+  const sends = [];
+  for (const patient of patients) {
+    for (const channel of campaign.channels) {
+      const send = {
+        id: randomUUID(),
+        campaign_id: campaignId,
+        clinic_id: clinicId,
+        patient_id: patient.id ?? null,
+        patient_phone: patient.phone,
+
+        whatsapp_status: channel === "whatsapp" ? "pending" : "skipped",
+        whatsapp_sent_at: null,
+        whatsapp_error: null,
+
+        sms_status: channel === "sms" ? "pending" : "skipped",
+        sms_sent_at: null,
+        sms_error: null,
+
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      dbInsert("campaign_sends", send);
+      sends.push(send);
+    }
+  }
+
+  dbUpdate("campaigns", (c) => c.id === campaignId, {
+    status: "scheduled",
+    started_at: new Date().toISOString(),
+    "stats.total_recipients": patients.length,
+  });
+
+  logger.info({ clinicId, campaignId, recipients: patients.length }, "[CAMPAIGN] Preparada para envio");
+
+  return { campaign, recipients: patients.length, sends };
+}

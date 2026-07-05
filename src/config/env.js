@@ -75,6 +75,11 @@ const envSchema = z
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().nonnegative().default(0),
 
+    // SMS (Twilio)
+    TWILIO_ACCOUNT_SID: optionalNonEmptyString,
+    TWILIO_AUTH_TOKEN: optionalNonEmptyString,
+    TWILIO_PHONE_NUMBER: optionalNonEmptyString,
+
     TABLE_CLINICS: z.string().default("clinics"),
     TABLE_AI_CONFIG: z.string().default("ai_secretary_config"),
     TABLE_AI_HANDOFF: z.string().default("ai_secretary_handoff"),
