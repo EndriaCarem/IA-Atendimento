@@ -7,6 +7,11 @@ import {
   deleteCampaignController,
   previewCampaignController,
   sendCampaignController,
+  estimateRecipientsController,
+  getProfessionalsController,
+  getSpecialtiesController,
+  getProceduresController,
+  getInsurancesController,
 } from "../controllers/campaigns.controller.js";
 
 const router = Router();
@@ -31,5 +36,14 @@ router.post("/clinics/:clinicId/campaigns/:campaignId/preview", previewCampaignC
 
 // Enviar campanha
 router.post("/clinics/:clinicId/campaigns/:campaignId/send", sendCampaignController);
+
+// Estimar quantidade de recipients
+router.post("/clinics/:clinicId/campaigns/estimate", estimateRecipientsController);
+
+// Dados auxiliares pra filtros
+router.get("/clinics/:clinicId/campaigns/data/professionals", getProfessionalsController);
+router.get("/clinics/:clinicId/campaigns/data/specialties", getSpecialtiesController);
+router.get("/clinics/:clinicId/campaigns/data/procedures", getProceduresController);
+router.get("/clinics/:clinicId/campaigns/data/insurances", getInsurancesController);
 
 export default router;

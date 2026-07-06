@@ -111,3 +111,114 @@ export function sendCampaignController(req, res, next) {
     next(err);
   }
 }
+
+// Estimar quantidade de recipients baseado em filtros
+export function estimateRecipientsController(req, res, next) {
+  try {
+    const { clinicId } = req.params;
+    const { audience_type, filters } = req.body;
+
+    // TODO: Implementar lógica de estimativa real baseada em audience_type e filters
+    // Por enquanto retorna contagem fake
+    const estimates = {
+      all: 542,
+      active: 437,
+      inactive: 105,
+      scheduled: 23,
+      absent: 198,
+      birthday: 12,
+      private: 234,
+      insurance: 308,
+      manual: 0,
+    };
+
+    const count = estimates[audience_type] || 0;
+
+    logger.info(`[CAMPAIGNS] Estimativa de recipients`, {
+      clinicId,
+      audience_type,
+      filters,
+      count,
+    });
+
+    res.json({ ok: true, data: { count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Buscar profissionais da clínica
+export function getProfessionalsController(req, res, next) {
+  try {
+    const { clinicId } = req.params;
+
+    // TODO: Buscar de verdade no banco de dados da clínica
+    const professionals = [
+      { id: 'prof-1', name: 'Dra. Maria Silva' },
+      { id: 'prof-2', name: 'Dr. João Costa' },
+      { id: 'prof-3', name: 'Dra. Ana Santos' },
+    ];
+
+    res.json({ ok: true, data: professionals });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Buscar especialidades
+export function getSpecialtiesController(req, res, next) {
+  try {
+    const { clinicId } = req.params;
+
+    // TODO: Buscar de verdade
+    const specialties = [
+      { id: 'spec-1', name: 'Odontologia Geral' },
+      { id: 'spec-2', name: 'Ortodontia' },
+      { id: 'spec-3', name: 'Implantodontia' },
+      { id: 'spec-4', name: 'Estética' },
+    ];
+
+    res.json({ ok: true, data: specialties });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Buscar procedimentos
+export function getProceduresController(req, res, next) {
+  try {
+    const { clinicId } = req.params;
+
+    // TODO: Buscar de verdade
+    const procedures = [
+      { id: 'proc-1', name: 'Limpeza' },
+      { id: 'proc-2', name: 'Clareamento' },
+      { id: 'proc-3', name: 'Restauração' },
+      { id: 'proc-4', name: 'Extração' },
+      { id: 'proc-5', name: 'Implante' },
+    ];
+
+    res.json({ ok: true, data: procedures });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Buscar convênios
+export function getInsurancesController(req, res, next) {
+  try {
+    const { clinicId } = req.params;
+
+    // TODO: Buscar de verdade
+    const insurances = [
+      { id: 'ins-1', name: 'Unimed' },
+      { id: 'ins-2', name: 'Bradesco Saúde' },
+      { id: 'ins-3', name: 'Amil' },
+      { id: 'ins-4', name: 'Sulamerica' },
+    ];
+
+    res.json({ ok: true, data: insurances });
+  } catch (err) {
+    next(err);
+  }
+}
