@@ -206,6 +206,55 @@ export function previewCampaign(campaignId, clinicId) {
   };
 }
 
+/**
+ * Materializa no JSON-db uma campanha que nasceu no Supabase (front novo).
+ * O front cria a campanha + destinatários no Supabase e só chama /send com
+ * { campaign_id, template, channels, recipients }. Como o disparo (Evolution)
+ * roda aqui, precisamos de um registro local para o pipeline de campaign_sends.
+ * Idempotente: se já existe (mesmo id), não duplica.
+ */
+export function ensureCampaignFromPayload(clinicId, payload) {
+  const { campaign_id, template, channels = ["whatsapp"], recipients = [], name = null } = payload;
+
+  if (!campaign_id) throw new Error("campaign_id obrigatório");
+  if (!template || template.trim().length === 0) throw new Error("Template obrigatório");
+
+  const existing = dbFindOne("campaigns", (c) => c.id === campaign_id);
+  if (existing) return existing;
+
+  const campaign = {
+    id: campaign_id,
+    clinic_id: clinicId,
+    name: name ?? "Campanha",
+    description: null,
+    template,
+    channels,
+    filters: {},
+    audience_type: payload.audience_type ?? null,
+    recipients: Array.isArray(recipients)
+      ? recipients
+          .filter((r) => r && r.phone)
+          .map((r) => ({
+            patient_id: r.patient_id ?? r.id ?? null,
+            phone: r.phone,
+            name: r.name ?? r.full_name ?? null,
+          }))
+      : [],
+    scheduled_for: null,
+    timezone: "America/Sao_Paulo",
+    status: "draft",
+    created_at: new Date().toISOString(),
+    started_at: null,
+    completed_at: null,
+    stats: { total_recipients: 0, sent_whatsapp: 0, sent_sms: 0, failed_whatsapp: 0, failed_sms: 0, bounced: 0 },
+    source: "supabase",
+  };
+
+  dbInsert("campaigns", campaign);
+  logger.info({ clinicId, campaignId: campaign_id, recipients: campaign.recipients.length }, "[CAMPAIGN] Materializada do Supabase");
+  return campaign;
+}
+
 export function prepareCampaignForSend(campaignId, clinicId) {
   const campaign = getCampaignById(campaignId, clinicId);
 

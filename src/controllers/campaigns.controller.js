@@ -5,6 +5,7 @@ import {
   updateCampaign,
   deleteCampaign,
   prepareCampaignForSend,
+  ensureCampaignFromPayload,
   previewCampaign,
 } from "../services/campaigns.service.js";
 import { processCampaignDispatches } from "../services/campaign-dispatcher.service.js";
@@ -86,6 +87,14 @@ export function previewCampaignController(req, res, next) {
 export function sendCampaignController(req, res, next) {
   try {
     const { clinicId, campaignId } = req.params;
+    const body = req.body ?? {};
+
+    // Front novo (Supabase) manda template/channels/recipients no body e a
+    // campanha só existe no Supabase. Materializa localmente antes de disparar.
+    // Se o body vier vazio (fluxo antigo), segue usando a campanha já no JSON-db.
+    if (Array.isArray(body.recipients) || body.template) {
+      ensureCampaignFromPayload(clinicId, { campaign_id: campaignId, ...body });
+    }
 
     const result = prepareCampaignForSend(campaignId, clinicId);
 
