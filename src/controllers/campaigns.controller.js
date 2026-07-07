@@ -7,6 +7,7 @@ import {
   prepareCampaignForSend,
   ensureCampaignFromPayload,
   previewCampaign,
+  getCampaignReplies,
 } from "../services/campaigns.service.js";
 import { processCampaignDispatches } from "../services/campaign-dispatcher.service.js";
 import { logger } from "../lib/logger.js";
@@ -127,6 +128,18 @@ export function sendCampaignController(req, res, next) {
         channels: result.campaign.channels,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Quem respondeu à campanha (inbound após o envio). Body: { recipients: [{phone, sent_at}] }
+export function campaignRepliesController(req, res, next) {
+  try {
+    const { clinicId } = req.params;
+    const recipients = Array.isArray(req.body?.recipients) ? req.body.recipients : [];
+    const replies = getCampaignReplies(clinicId, recipients);
+    res.json({ ok: true, data: replies });
   } catch (err) {
     next(err);
   }

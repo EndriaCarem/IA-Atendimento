@@ -310,3 +310,38 @@ export function prepareCampaignForSend(campaignId, clinicId) {
 
   return { campaign, recipients: patients.length, sends };
 }
+
+/**
+ * Dado um conjunto de telefones e a data de envio da campanha, retorna quais
+ * responderam DEPOIS de receber (mensagem inbound após sent_at). Usado pelo
+ * painel de histórico para marcar "respondeu: sim/não" por destinatário.
+ * A campanha vive no Supabase, então o front manda a lista { phone, sent_at }.
+ */
+export function getCampaignReplies(clinicId, recipients = []) {
+  if (!clinicId || !Array.isArray(recipients)) return {};
+
+  const result = {};
+  for (const r of recipients) {
+    const phone = String(r.phone ?? "").replace(/\D/g, "");
+    if (!phone) continue;
+    const since = r.sent_at ? new Date(r.sent_at).getTime() : 0;
+
+    const replies = dbFind(
+      "whatsapp_messages",
+      (m) =>
+        m.clinic_id === clinicId &&
+        m.direction === "inbound" &&
+        String(m.patient_phone ?? "").replace(/\D/g, "").endsWith(phone.slice(-8)) &&
+        new Date(m.created_at).getTime() >= since
+    );
+
+    result[r.phone] = {
+      replied: replies.length > 0,
+      reply_count: replies.length,
+      last_reply_at: replies.length
+        ? replies.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0].created_at
+        : null,
+    };
+  }
+  return result;
+}

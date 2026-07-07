@@ -7,6 +7,7 @@ import {
   deleteCampaignController,
   previewCampaignController,
   sendCampaignController,
+  campaignRepliesController,
   estimateRecipientsController,
   getProfessionalsController,
   getSpecialtiesController,
@@ -36,6 +37,9 @@ router.post("/clinics/:clinicId/campaigns/:campaignId/preview", previewCampaignC
 
 // Enviar campanha
 router.post("/clinics/:clinicId/campaigns/:campaignId/send", sendCampaignController);
+
+// Quem respondeu à campanha (inbound após envio)
+router.post("/clinics/:clinicId/campaigns/replies", campaignRepliesController);
 
 // Estimar quantidade de recipients
 router.post("/clinics/:clinicId/campaigns/estimate", estimateRecipientsController);
