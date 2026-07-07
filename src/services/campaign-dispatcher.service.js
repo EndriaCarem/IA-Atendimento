@@ -78,10 +78,11 @@ async function dispatchWhatsApp(send) {
     throw new Error("WhatsApp não conectado");
   }
 
+  // Nome salvo no próprio send (resolvido do Supabase). Fallback: JSON-db local.
   const patient = send.patient_id ? dbFindOne("patients", (p) => p.id === send.patient_id) : null;
 
   const text = renderAutomationTemplate(campaign.template, {
-    patient_name: patient?.name ?? "Paciente",
+    patient_name: send.patient_name ?? patient?.name ?? "Paciente",
   });
 
   await sendEvolutionTextMessage({
@@ -106,7 +107,7 @@ async function dispatchSMS(send) {
   const patient = send.patient_id ? dbFindOne("patients", (p) => p.id === send.patient_id) : null;
 
   const text = renderAutomationTemplate(campaign.template, {
-    patient_name: patient?.name ?? "Olá",
+    patient_name: send.patient_name ?? patient?.name ?? "Olá",
   });
 
   await sendTwilioSMS({

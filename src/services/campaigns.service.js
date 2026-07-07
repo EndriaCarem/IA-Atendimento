@@ -9,6 +9,8 @@ export function createCampaign(clinicId, payload) {
     template,
     channels = ["whatsapp"],
     filters = {},
+    recipients = null,
+    audience_type = null,
     scheduled_for = null,
     timezone = "America/Sao_Paulo",
   } = payload;
@@ -39,6 +41,19 @@ export function createCampaign(clinicId, payload) {
       procedures: filters.procedures ?? null,
       insurance_plan: filters.insurance_plan ?? null,
     },
+    audience_type: audience_type ?? null,
+    // Lista de destinatários resolvida pelo front (Supabase = base real).
+    // Cada item: { patient_id, phone, name }. Quando presente, o envio usa
+    // ela direto; senão cai no filtro do JSON-db (retrocompatível).
+    recipients: Array.isArray(recipients)
+      ? recipients
+          .filter((r) => r && r.phone)
+          .map((r) => ({
+            patient_id: r.patient_id ?? r.id ?? null,
+            phone: r.phone,
+            name: r.name ?? r.full_name ?? null,
+          }))
+      : null,
     scheduled_for,
     timezone,
     status: "draft",
@@ -202,7 +217,11 @@ export function prepareCampaignForSend(campaignId, clinicId) {
     throw new Error("Campanha deve estar em draft para preparar envio");
   }
 
-  const patients = getFilteredPatients(clinicId, campaign.filters);
+  // Prioriza a lista de destinatários resolvida pelo front (base real do
+  // Supabase). Fallback: filtro do JSON-db local (campanhas antigas / IA).
+  const patients = Array.isArray(campaign.recipients) && campaign.recipients.length > 0
+    ? campaign.recipients
+    : getFilteredPatients(clinicId, campaign.filters);
 
   const sends = [];
   for (const patient of patients) {
@@ -211,7 +230,8 @@ export function prepareCampaignForSend(campaignId, clinicId) {
         id: randomUUID(),
         campaign_id: campaignId,
         clinic_id: clinicId,
-        patient_id: patient.id ?? null,
+        patient_id: patient.patient_id ?? patient.id ?? null,
+        patient_name: patient.name ?? patient.full_name ?? null,
         patient_phone: patient.phone,
 
         whatsapp_status: channel === "whatsapp" ? "pending" : "skipped",
