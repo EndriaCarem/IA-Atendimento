@@ -93,7 +93,18 @@ export function sendCampaignController(req, res, next) {
     // campanha só existe no Supabase. Materializa localmente antes de disparar.
     // Se o body vier vazio (fluxo antigo), segue usando a campanha já no JSON-db.
     if (Array.isArray(body.recipients) || body.template) {
-      ensureCampaignFromPayload(clinicId, { campaign_id: campaignId, ...body });
+      const campaign = ensureCampaignFromPayload(clinicId, { campaign_id: campaignId, ...body });
+      // Já foi enviada (materialização idempotente devolveu uma campanha não-draft):
+      // não reprocessa nem estoura 500 — responde claro que já saiu.
+      if (campaign.status !== "draft") {
+        res.status(409).json({
+          ok: false,
+          error: "Campanha já foi enviada",
+          code: "ALREADY_SENT",
+          data: { campaign_id: campaignId, status: campaign.status },
+        });
+        return;
+      }
     }
 
     const result = prepareCampaignForSend(campaignId, clinicId);
