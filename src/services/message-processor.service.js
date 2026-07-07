@@ -267,12 +267,22 @@ export async function processIncomingPatientMessage(incomingMessage) {
     // descartado (assim a IA volta a usar a saudação configurada e não fica presa
     // num fluxo abandonado). Janela de sessão = 3h.
     const SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
-    const sessionCutoff = Date.now() - SESSION_WINDOW_MS;
-    const recentMessages = dbFind(
+    // Campanha: o paciente pode responder horas depois de receber. Se a última
+    // mensagem foi uma campanha, estende a janela (48h) para a IA lembrar o que
+    // enviou e conectar a resposta ("quero") ao contexto da campanha.
+    const CAMPAIGN_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+    const allMessages = dbFind(
       "whatsapp_messages",
       (m) => m.clinic_id === tenant.clinicId && m.patient_phone === phoneDigits
-    )
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const lastOutbound = [...allMessages].reverse().find((m) => m.direction === "outbound");
+    const lastWasCampaign = lastOutbound?.metadata?.source === "campaign";
+    const windowMs = lastWasCampaign ? CAMPAIGN_WINDOW_MS : SESSION_WINDOW_MS;
+    const sessionCutoff = Date.now() - windowMs;
+
+    const recentMessages = allMessages
       .filter((m) => new Date(m.created_at).getTime() >= sessionCutoff)
       .slice(-8);
 

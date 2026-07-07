@@ -2,6 +2,7 @@ import { dbFind, dbUpdate, dbFindOne } from "../lib/json-db.js";
 import { sendEvolutionTextMessage } from "../lib/evolution.js";
 import { sendTwilioSMS } from "../lib/twilio.js";
 import { findInstanceByClinicId } from "../repositories/whatsapp-instance.repository.js";
+import { insertWhatsAppMessage } from "../repositories/whatsapp-message.repository.js";
 import { renderAutomationTemplate } from "./automation-template.service.js";
 import { logger } from "../lib/logger.js";
 
@@ -98,6 +99,28 @@ async function dispatchWhatsApp(send) {
     whatsapp_sent_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
+
+  // Registra a mensagem da campanha no histórico da conversa para que a IA
+  // saiba o que ELA enviou. Sem isso, quando o paciente responde ("quero"),
+  // a IA trata como conversa nova e não conecta com a campanha.
+  try {
+    await insertWhatsAppMessage({
+      clinicId: send.clinic_id,
+      patientPhone: send.patient_phone,
+      patientName: send.patient_name ?? patient?.name ?? null,
+      direction: "outbound",
+      text,
+      instanceName: mapping.instanceName,
+      aiHandled: false,
+      metadata: {
+        source: "campaign",
+        campaign_id: send.campaign_id,
+        delivery_status: "sent",
+      },
+    });
+  } catch (err) {
+    logger.warn({ sendId: send.id, err: err.message }, "[DISPATCH] Falha ao registrar msg da campanha no histórico");
+  }
 
   logger.info({ sendId: send.id, phone: send.patient_phone }, "[DISPATCH] WhatsApp enviado");
 }
