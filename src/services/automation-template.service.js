@@ -46,16 +46,32 @@ function firstName(fullName) {
 export function renderAutomationTemplate(template, ctx = {}) {
   if (!template) return "";
 
+  const patientName = firstName(ctx.patient_name) || "tudo bem";
+  const clinicName = ctx.clinic_name ?? "";
+  const dateStr = formatDate(ctx.start_time);
+  const timeStr = formatTime(ctx.start_time);
+
   const vars = {
-    patient_name: firstName(ctx.patient_name) || "tudo bem",
-    date: formatDate(ctx.start_time),
-    time: formatTime(ctx.start_time),
+    // nomes técnicos
+    patient_name: patientName,
+    date: dateStr,
+    time: timeStr,
     doctor: ctx.doctor ?? "",
     procedure: ctx.procedure ?? "",
-    clinic_name: ctx.clinic_name ?? "",
+    clinic_name: clinicName,
+    // aliases em português (o front/Lovable usa {nome} e {clinica})
+    nome: patientName,
+    clinica: clinicName,
+    clínica: clinicName,
+    data: dateStr,
+    hora: timeStr,
+    medico: ctx.doctor ?? "",
+    médico: ctx.doctor ?? "",
+    procedimento: ctx.procedure ?? "",
   };
 
-  return template.replace(/\{(\w+)\}/g, (match, key) => {
+  // aceita letras acentuadas nas chaves ({clínica}, {médico})
+  return template.replace(/\{([\p{L}_]+)\}/gu, (match, key) => {
     return key in vars ? vars[key] : match;
   });
 }

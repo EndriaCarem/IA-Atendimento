@@ -80,9 +80,11 @@ async function dispatchWhatsApp(send) {
 
   // Nome salvo no próprio send (resolvido do Supabase). Fallback: JSON-db local.
   const patient = send.patient_id ? dbFindOne("patients", (p) => p.id === send.patient_id) : null;
+  const clinic = dbFindOne("clinics", (c) => c.id === send.clinic_id);
 
   const text = renderAutomationTemplate(campaign.template, {
     patient_name: send.patient_name ?? patient?.name ?? "Paciente",
+    clinic_name: clinic?.name ?? clinic?.clinic_name ?? "",
   });
 
   await sendEvolutionTextMessage({
@@ -105,9 +107,11 @@ async function dispatchSMS(send) {
   if (!campaign) throw new Error("Campanha não encontrada");
 
   const patient = send.patient_id ? dbFindOne("patients", (p) => p.id === send.patient_id) : null;
+  const clinic = dbFindOne("clinics", (c) => c.id === send.clinic_id);
 
   const text = renderAutomationTemplate(campaign.template, {
     patient_name: send.patient_name ?? patient?.name ?? "Olá",
+    clinic_name: clinic?.name ?? clinic?.clinic_name ?? "",
   });
 
   await sendTwilioSMS({
