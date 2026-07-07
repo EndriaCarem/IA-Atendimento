@@ -7,16 +7,22 @@
  * em automation-hooks.service.js e são chamadas no momento do sync.
  */
 
-import { dbFind } from "../lib/json-db.js";
+import { dbFind, dbFindOne } from "../lib/json-db.js";
 import { dispatchAutomationMessage, alreadySent } from "./automation-sender.service.js";
 import { runNpsSurveys } from "./nps.service.js";
 import { logger } from "../lib/logger.js";
 
 const TICK_MS = 10 * 60 * 1000; // 10 minutos
 
-// Janela de antecedência do lembrete (24h ± 30min de tolerância do tick)
-const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
+// Janela de antecedência do lembrete (1h antes ± 30min de tolerância do tick)
+const REMINDER_LEAD_MS = 1 * 60 * 60 * 1000;
 const REMINDER_WINDOW_MS = 35 * 60 * 1000;
+
+// Nome da clínica para as variáveis {clinic_name} dos templates.
+function getClinicName(clinicId) {
+  const clinic = dbFindOne("clinics", (c) => c.id === clinicId);
+  return clinic?.name ?? clinic?.clinic_name ?? "";
+}
 
 // Para "retorno": dispara quando faz N dias desde a última consulta concluída
 const RETURN_DEFAULT_DAYS = 180;
@@ -46,6 +52,7 @@ async function runReminders(now) {
     const automations = getActiveAutomations(clinicId, "appointment_reminder");
     if (automations.length === 0) continue;
     const template = automations[0].message_template;
+    const clinicName = getClinicName(clinicId);
 
     const appts = dbFind(
       "synced_appointments",
@@ -73,6 +80,7 @@ async function runReminders(now) {
           start_time: apt.start_time,
           doctor: apt.dentist_name,
           procedure: apt.procedure,
+          clinic_name: clinicName,
         },
       });
     }
