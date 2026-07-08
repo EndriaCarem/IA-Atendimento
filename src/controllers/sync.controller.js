@@ -167,24 +167,25 @@ export function syncDoctorController(req, res, next) {
       return res.status(400).json({ ok: false, error: "user_id e clinic_id são obrigatórios" });
     }
 
-    const record = dbUpsert(
-      "doctors",
-      {
-        id: `${doctor.clinic_id}:${doctor.user_id}`,
-        clinic_id: doctor.clinic_id,
-        user_id: doctor.user_id,
-        full_name: doctor.full_name ?? null,
-        role: doctor.role ?? null,
-        specialty: doctor.specialty ?? null,
-        active: doctor.active ?? true,
-        // Procedimentos que ESTE médico atende (clinic_member_procedures).
-        // Aceita variações de nome vindas do Lovable.
-        procedures: Array.isArray(doctor.procedures) ? doctor.procedures
-          : Array.isArray(doctor.procedure_names) ? doctor.procedure_names : [],
-        _synced_at: new Date().toISOString(),
-      },
-      "id"
-    );
+    // Só grava um campo quando ele REALMENTE veio no payload — sync parcial do
+    // Lovable (sem procedures/full_name) NÃO pode zerar o que já estava salvo.
+    // O dbUpsert faz merge e preserva os campos ausentes. (bug sync-zera-arrays)
+    const doctorRecord = {
+      id: `${doctor.clinic_id}:${doctor.user_id}`,
+      clinic_id: doctor.clinic_id,
+      user_id: doctor.user_id,
+      role: doctor.role ?? null,
+      active: doctor.active ?? true,
+      _synced_at: new Date().toISOString(),
+    };
+    if (doctor.full_name != null) doctorRecord.full_name = doctor.full_name;
+    if (doctor.specialty != null) doctorRecord.specialty = doctor.specialty;
+    // Procedimentos que ESTE médico atende (aceita variações de nome do Lovable).
+    const procs = Array.isArray(doctor.procedures) ? doctor.procedures
+      : Array.isArray(doctor.procedure_names) ? doctor.procedure_names : null;
+    if (procs != null) doctorRecord.procedures = procs;
+
+    const record = dbUpsert("doctors", doctorRecord, "id");
 
     res.json({ ok: true, success: true, data: record });
   } catch (err) {
@@ -204,22 +205,21 @@ export function syncDoctorsController(req, res, next) {
     let saved = 0;
     for (const d of doctors) {
       if (!d.user_id) continue;
-      dbUpsert(
-        "doctors",
-        {
-          id: `${clinic_id}:${d.user_id}`,
-          clinic_id,
-          user_id: d.user_id,
-          full_name: d.full_name ?? null,
-          role: d.role ?? null,
-          specialty: d.specialty ?? null,
-          active: d.active ?? true,
-          procedures: Array.isArray(d.procedures) ? d.procedures
-            : Array.isArray(d.procedure_names) ? d.procedure_names : [],
-          _synced_at: new Date().toISOString(),
-        },
-        "id"
-      );
+      // Sync parcial não pode zerar full_name/specialty/procedures já salvos.
+      const rec = {
+        id: `${clinic_id}:${d.user_id}`,
+        clinic_id,
+        user_id: d.user_id,
+        role: d.role ?? null,
+        active: d.active ?? true,
+        _synced_at: new Date().toISOString(),
+      };
+      if (d.full_name != null) rec.full_name = d.full_name;
+      if (d.specialty != null) rec.specialty = d.specialty;
+      const procs = Array.isArray(d.procedures) ? d.procedures
+        : Array.isArray(d.procedure_names) ? d.procedure_names : null;
+      if (procs != null) rec.procedures = procs;
+      dbUpsert("doctors", rec, "id");
       saved++;
     }
 
