@@ -7,18 +7,21 @@
  * depender de restart manual.
  *
  * Recuperação SEGURA (não afeta outras clínicas):
- *   - Detecta instância "open" mas sem eventos há > SILENCE_THRESHOLD = zumbi.
- *   - Tenta LOGOUT + CONNECT da própria instância (a recuperação que funciona —
- *     só connect cego NÃO destrava o estado "open" fantasma).
- *   - Limita a MAX_ATTEMPTS por instância: depois disso, PARA e só ALERTA
- *     ("reconecte pelo painel / sessão precisa de QR"). Não insiste pra sempre.
- *   - NÃO reinicia o container (afeta todas as clínicas) — se a Evolution inteira
- *     travar, apenas registra ALERTA para intervenção.
+ *   - "open" sem eventos há > SILENCE_THRESHOLD é só SUSPEITA de zumbi: conexão
+ *     OCIOSA (ninguém mandando mensagem) também não gera evento nenhum. Antes de
+ *     agir, faz um PROBE ATIVO (sendPresence): se responde, está viva — não mexe
+ *     e renova o heartbeat.
+ *   - Só se o probe FALHAR: RESTART da instância (preserva a sessão/credenciais;
+ *     reconecta sozinho SEM QR). NUNCA logout automático — logout destrói as
+ *     credenciais e derruba sessão saudável exigindo re-scan (bug 2026-07-08:
+ *     12 logouts indevidos em sessões apenas ociosas, "cai toda hora").
+ *   - Limita a MAX_ATTEMPTS por instância: depois disso, PARA e só ALERTA.
+ *   - NÃO reinicia o container (afeta todas as clínicas).
  *   - Estado "close"/"connecting": não age (pode ser desconexão proposital
  *     aguardando QR manual no painel).
  *
- * Lição da versão anterior (desativada): disparar /instance/connect cegamente a
- * cada tick não destrava o "open" fantasma e podia derrubar sessão recém-pareada.
+ * Lições anteriores: connect cego a cada tick não destrava zumbi e derrubava
+ * sessão recém-pareada; logout+connect derrubava sessões vivas ociosas.
  */
 
 import { logger } from "../lib/logger.js";
@@ -26,13 +29,14 @@ import { env } from "../config/env.js";
 import { listAllInstances } from "../repositories/clinic.repository.js";
 import {
   getEvolutionConnectionState,
-  getEvolutionQrCode,
-  logoutEvolutionInstance,
+  getEvolutionOwnerNumber,
+  pingEvolutionConnection,
+  restartEvolutionInstance,
 } from "../lib/evolution-api.js";
-import { getLastEventAt } from "./evolution-heartbeat.service.js";
+import { getLastEventAt, recordInstanceEvent } from "./evolution-heartbeat.service.js";
 
 const CHECK_INTERVAL_MS = 3 * 60 * 1000;      // roda a cada 3 min
-const SILENCE_THRESHOLD_MS = 5 * 60 * 1000;   // 5 min "open" sem eventos = zumbi
+const SILENCE_THRESHOLD_MS = 10 * 60 * 1000;  // 10 min "open" sem eventos = SUSPEITA (probe decide)
 const WARMUP_MS = 90 * 1000;                  // espera o servidor estabilizar
 const COOLDOWN_MS = 8 * 60 * 1000;            // mínimo entre recuperações da mesma instância
 const MAX_ATTEMPTS = 3;                        // após isso, só alerta (precisa QR manual)
@@ -64,15 +68,13 @@ async function tryRecover(instanceName, motivo) {
   r.attempts += 1;
   recovery.set(instanceName, r);
 
-  logger.warn({ instanceName, motivo, tentativa: r.attempts }, "[HEALTH] ALERTA: recuperando instância (logout+connect)");
+  logger.warn({ instanceName, motivo, tentativa: r.attempts }, "[HEALTH] ALERTA: recuperando instância (restart, preserva sessão)");
   try {
-    // 1) Logout limpa o estado "open" fantasma (só connect não resolve).
-    await logoutEvolutionInstance(instanceName).catch((e) =>
-      logger.warn({ instanceName, err: e?.message }, "[HEALTH] logout falhou (processo pode estar travado)")
-    );
-    // 2) Connect gera nova sessão (ou QR, se a sessão expirou de vez).
-    await getEvolutionQrCode(instanceName);
-    logger.warn({ instanceName, tentativa: r.attempts }, "[HEALTH] Recuperação disparada — aguardando instância voltar");
+    // RESTART reinicia o socket preservando as credenciais da sessão — a
+    // instância reconecta sozinha, SEM pedir QR. (Logout automático é proibido:
+    // destruía a sessão e obrigava re-scan toda vez que ficava ociosa.)
+    await restartEvolutionInstance(instanceName);
+    logger.warn({ instanceName, tentativa: r.attempts }, "[HEALTH] Restart disparado — aguardando instância reconectar");
   } catch (err) {
     logger.error({ instanceName, err: err?.message }, "[HEALTH] ALERTA: falha ao recuperar instância");
   }
@@ -107,7 +109,25 @@ async function checkInstance(instance) {
 
   const silenceMs = Date.now() - lastEventAt;
   if (silenceMs > SILENCE_THRESHOLD_MS) {
-    await tryRecover(instanceName, `open sem eventos ha ${Math.round(silenceMs / 1000)}s`);
+    // Silêncio NÃO prova que caiu — conexão ociosa também fica muda. Probe
+    // ativo (sendPresence) decide: se responde, está viva; renova o heartbeat
+    // pra não re-testar a cada tick.
+    const selfNumber = await getEvolutionOwnerNumber(instanceName);
+    const alive = selfNumber
+      ? await pingEvolutionConnection(instanceName, selfNumber)
+      : false;
+
+    if (alive) {
+      recordInstanceEvent(instanceName);
+      markHealthy(instanceName);
+      logger.info(
+        { instanceName, silenceSec: Math.round(silenceMs / 1000) },
+        "[HEALTH] Ociosa mas viva (probe ok) — nada a fazer"
+      );
+      return;
+    }
+
+    await tryRecover(instanceName, `open sem eventos ha ${Math.round(silenceMs / 1000)}s e probe falhou`);
   } else {
     // Está recebendo eventos = saudável. Zera tentativas.
     markHealthy(instanceName);
