@@ -21,6 +21,9 @@ const CORS_ORIGINS = new Set([
   "https://79045439-7b18-48fd-93c6-8c5db66aba23.lovableproject.com",
   "https://id-preview--79045439-7b18-48fd-93c6-8c5db66aba23.lovable.app",
   "https://dental-bridge-suite.lovable.app",
+  // Domínio de produção próprio
+  "https://iaclin.com",
+  "https://www.iaclin.com",
   // Dev local
   "http://localhost:8080",
   "http://localhost:5173",
@@ -30,6 +33,7 @@ const CORS_ORIGIN_PATTERNS = [
   /^https:\/\/([a-z0-9-]+\.)*lovable\.app$/i,
   /^https:\/\/([a-z0-9-]+\.)*lovableproject\.com$/i,
   /^https:\/\/([a-z0-9-]+\.)*lovable\.dev$/i,
+  /^https:\/\/([a-z0-9-]+\.)*iaclin\.com$/i,
 ];
 
 function isAllowedCorsOrigin(origin) {
