@@ -67,6 +67,10 @@ export async function findClinicById(clinicId) {
   return {
     id: clinicData.id,
     name: clinicData.name ?? null,
+    // Tipo da clínica (médica/odonto/psi...) sincronizado do painel — a IA
+    // usa pra adaptar o vocabulário e nunca assumir odontologia por padrão.
+    category: clinicData.category ?? null,
+    categoryLabel: clinicData.category_label ?? null,
     address: clinicData.address ?? clinicConfig?.address ?? null,
     timezone,
     customPrompt: aiConfig?.[env.COL_AI_CONFIG_PROMPT] ?? "",

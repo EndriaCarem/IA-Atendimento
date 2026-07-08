@@ -27,6 +27,8 @@ export function syncConfigController(req, res, next) {
     const {
       clinic_id,
       name,
+      category,
+      category_label,
       address,
       business_hours,
       timezone,
@@ -71,6 +73,10 @@ export function syncConfigController(req, res, next) {
       _synced_at:     new Date().toISOString(),
     };
     if (timezone || time_zone) clinicRecord.timezone = timezone ?? time_zone;
+    // Tipo da clínica (médica/odonto/psi...) — usado pela IA pra adaptar o
+    // vocabulário. Só grava quando vem no payload (sync parcial preserva).
+    if (category != null) clinicRecord.category = category;
+    if (category_label != null) clinicRecord.category_label = category_label;
     dbUpsert("clinics", clinicRecord, "id");
 
     // Sincroniza config de handoff humano quando o Lovable enviar o campo.

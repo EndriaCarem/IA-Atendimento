@@ -317,11 +317,18 @@ function extractCustomGreeting(customPrompt) {
   return greeting || null;
 }
 
-function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPrompt, businessHours, handoff, procedures, insurancePlans, doctors, freeSlotsContext, conversationHistory, stateContext, isKnownPatient = false, knownPatientName = null, timezone = env.DEFAULT_TIMEZONE }) {
+function buildSystemPrompt({ clinicName, clinicCategory = null, clinicAddress, bookingLink, customPrompt, businessHours, handoff, procedures, insurancePlans, doctors, freeSlotsContext, conversationHistory, stateContext, isKnownPatient = false, knownPatientName = null, timezone = env.DEFAULT_TIMEZONE }) {
   const customGreeting = extractCustomGreeting(customPrompt);
   // Se houver saudação configurada, ela define o nome/identidade — tem prioridade
   // sobre o clinicName do banco (que pode estar desatualizado).
-  const clinicDescriptor = clinicName ? `Clinica: ${clinicName}.` : "Clinica nao identificada.";
+  const clinicDescriptor = clinicName
+    ? `Clinica: ${clinicName}.${clinicCategory ? ` Tipo: ${clinicCategory}.` : ""}`
+    : "Clinica nao identificada.";
+  // Vocabulário por tipo: nunca assumir odontologia — usar o termo certo pro
+  // profissional (médico, dentista, psicólogo...) conforme o tipo da clínica.
+  const vocabularyRule = clinicCategory
+    ? `VOCABULARIO (tipo de clinica: ${clinicCategory}): use termos coerentes com esse tipo ao se referir aos profissionais e atendimentos (ex: clinica medica → 'medico(a)' e 'consulta'; odontologica → 'dentista'; psicologia → 'psicologo(a)' e 'sessao'). NUNCA use termos de outra area (ex: nao diga 'dentista' ou 'avaliacao odontologica' numa clinica medica).`
+    : "VOCABULARIO: o tipo da clinica nao foi informado — use termos NEUTROS ('profissional', 'consulta', 'atendimento'); NUNCA assuma que e odontologia ou qualquer especialidade.";
   // CRÍTICO: a saudação só vale quando NÃO há histórico (primeira mensagem real).
   // Se já existe conversa, NÃO força a saudação inteira — senão a IA repete e nunca
   // avança. Mas SEMPRE injetamos a saudação oficial como referência de identidade,
@@ -381,6 +388,7 @@ function buildSystemPrompt({ clinicName, clinicAddress, bookingLink, customPromp
     "EMERGENCIA/URGENCIA MEDICA (REGRA ABSOLUTA): se o paciente disser que esta passando mal, infarto, falta de ar, desmaio, dor no peito, sangramento intenso, acidente, risco de morte, ou qualquer emergencia/urgencia medica, responda exatamente: 'Sinto muito que voce esteja passando por isso. Em caso de urgencia ou emergencia, ligue para o SAMU 192 ou procure o pronto atendimento mais proximo agora.' Nao tente agendar consulta, nao faca triagem e nao peca dados.",
     "Se o paciente perguntar algo medico (sintoma, diagnostico, remedio, tratamento), responda exatamente: 'Para duvidas medicas, o profissional respondera na consulta.' e siga ajudando com agendamento.",
     clinicDescriptor,
+    vocabularyRule,
     stateContext,
     "",
     "Regras de isolamento de tenant:",

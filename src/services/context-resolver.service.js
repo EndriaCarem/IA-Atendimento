@@ -28,6 +28,7 @@ export async function resolveTenantContext(instanceName) {
   return {
     clinicId: clinic.id,
     clinicName: clinic.name,
+    clinicCategory: clinic.categoryLabel ?? clinic.category ?? null,
     clinicAddress: clinic.address,
     customPrompt: clinic.customPrompt,
     aiEnabled: clinic.aiEnabled,
