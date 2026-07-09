@@ -6,6 +6,43 @@ import { insertWhatsAppMessage } from "../repositories/whatsapp-message.reposito
 import { renderAutomationTemplate } from "./automation-template.service.js";
 import { logger } from "../lib/logger.js";
 
+// ── Throttle anti-bloqueio ────────────────────────────────────────────────────
+// Disparo em massa rápido demais é o perfil clássico de ban do WhatsApp.
+// Cadência humana: delay ALEATÓRIO entre mensagens + pausa longa a cada lote.
+// Com os defaults, ~450-900 msgs/hora — 1000 contatos levam ~1h30-2h30.
+// Ajustável por env sem redeploy de código.
+const MSG_DELAY_MIN_MS = Number(process.env.CAMPAIGN_MSG_DELAY_MIN_MS) || 4000;
+const MSG_DELAY_MAX_MS = Number(process.env.CAMPAIGN_MSG_DELAY_MAX_MS) || 8000;
+const BATCH_SIZE = Number(process.env.CAMPAIGN_BATCH_SIZE) || 30;
+const BATCH_PAUSE_MS = Number(process.env.CAMPAIGN_BATCH_PAUSE_MS) || 4 * 60 * 1000;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const randomDelay = () =>
+  MSG_DELAY_MIN_MS + Math.floor(Math.random() * (MSG_DELAY_MAX_MS - MSG_DELAY_MIN_MS));
+
+/**
+ * Retoma campanhas interrompidas (ex: deploy/restart no meio de 1000 envios).
+ * Chamado no boot: qualquer campanha "scheduled" com sends pendentes continua
+ * de onde parou — os já enviados não repetem (status sent/failed é por send).
+ */
+export async function resumePendingCampaigns() {
+  const stuck = dbFind("campaigns", (c) => c.status === "scheduled");
+  for (const campaign of stuck) {
+    const pending = dbFind(
+      "campaign_sends",
+      (s) => s.campaign_id === campaign.id && (s.whatsapp_status === "pending" || s.sms_status === "pending")
+    );
+    if (pending.length === 0) continue;
+    logger.warn(
+      { campaignId: campaign.id, pending: pending.length },
+      "[DISPATCH] Retomando campanha interrompida (restart no meio do envio)"
+    );
+    processCampaignDispatches(campaign.id).catch((err) =>
+      logger.error({ campaignId: campaign.id, err: err.message }, "[DISPATCH] Falha ao retomar")
+    );
+  }
+}
+
 export async function processCampaignDispatches(campaignId) {
   const sends = dbFind("campaign_sends", (s) => s.campaign_id === campaignId);
 
@@ -18,7 +55,12 @@ export async function processCampaignDispatches(campaignId) {
     failed_sms: 0,
   };
 
+  let processed = 0;
   for (const send of sends) {
+    // Pula os já resolvidos (permite retomar campanha interrompida sem repetir).
+    const hasPending = send.whatsapp_status === "pending" || send.sms_status === "pending";
+    if (!hasPending) continue;
+
     if (send.whatsapp_status === "pending") {
       try {
         await dispatchWhatsApp(send);
@@ -51,7 +93,18 @@ export async function processCampaignDispatches(campaignId) {
       }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    processed++;
+
+    // Cadência anti-ban: pausa longa a cada lote, delay aleatório entre msgs.
+    if (processed % BATCH_SIZE === 0) {
+      logger.info(
+        { campaignId, processed, total: sends.length, pauseMin: Math.round(BATCH_PAUSE_MS / 60000) },
+        "[DISPATCH] Lote concluído — pausa anti-bloqueio"
+      );
+      await sleep(BATCH_PAUSE_MS);
+    } else {
+      await sleep(randomDelay());
+    }
   }
 
   const campaign = dbFindOne("campaigns", (c) => c.id === campaignId);
