@@ -19,13 +19,28 @@ export function extractIncomingMessage(payload) {
 
   const event = String(payload?.event ?? payload?.type ?? "unknown").toLowerCase();
 
-  const remoteJid =
+  const rawRemoteJid =
     key?.remoteJid ??
     data?.remoteJid ??
     payload?.remoteJid ??
     payload?.from ??
     payload?.sender ??
     null;
+
+  // WhatsApp introduziu o formato @lid (Linked ID) — um identificador opaco
+  // que NÃO é o telefone (ex: "205020968562888@lid"). Nesse caso, o telefone
+  // real vem em key.remoteJidAlt / key.senderPn (Evolution API 2.3.7+).
+  // Sem isso, extrairíamos o LID como se fosse número e a resposta nunca
+  // chegaria ao paciente. Ver EvolutionAPI/evolution-api#1585, #2326.
+  const isLid = typeof rawRemoteJid === "string" && rawRemoteJid.includes("@lid");
+  const remoteJidAlt =
+    key?.remoteJidAlt ??
+    data?.remoteJidAlt ??
+    key?.senderPn ??
+    data?.senderPn ??
+    payload?.senderPn ??
+    null;
+  const remoteJid = isLid && remoteJidAlt ? remoteJidAlt : rawRemoteJid;
 
   const text = firstValidText([
     data?.message?.conversation,
@@ -59,6 +74,10 @@ export function extractIncomingMessage(payload) {
     event,
     instanceName,
     remoteJid,
+    // true quando o remoteJid original era @lid (resolvido ou não p/ telefone real).
+    wasLid: isLid,
+    // true só quando era @lid E não achamos telefone real — mensagem será perdida.
+    unresolvedLid: isLid && !remoteJidAlt,
     text,
     messageId,
     timestamp,

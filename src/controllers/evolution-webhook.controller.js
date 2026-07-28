@@ -45,6 +45,23 @@ export async function evolutionWebhookController(req, res, next) {
       messageId: incoming.messageId,
     }, "[WEBHOOK] Mensagem extraída");
 
+    // WhatsApp @lid: loga quando resolvemos (ou falhamos em resolver) o telefone
+    // real via remoteJidAlt/senderPn. unresolvedLid=true = mensagem SEM telefone
+    // válido — não há como responder, precisa investigar o payload cru.
+    if (incoming.wasLid) {
+      if (incoming.unresolvedLid) {
+        logger.error({
+          instanceName: incoming.instanceName,
+          rawBody: req.body,
+        }, "[WEBHOOK] @lid SEM remoteJidAlt/senderPn — telefone real não encontrado, mensagem será perdida");
+      } else {
+        logger.info({
+          instanceName: incoming.instanceName,
+          resolvedPhone: incoming.remoteJid,
+        }, "[WEBHOOK] @lid resolvido para telefone real via remoteJidAlt/senderPn");
+      }
+    }
+
     // connection.update: registra o estado e o MOTIVO da queda (statusReason).
     // É a única fonte do "por que o WhatsApp desconectou sozinho" — antes esse
     // evento era descartado como NON_MESSAGE_EVENT sem nenhum log.
