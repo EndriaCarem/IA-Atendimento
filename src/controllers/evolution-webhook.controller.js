@@ -46,9 +46,13 @@ export async function evolutionWebhookController(req, res, next) {
     }, "[WEBHOOK] Mensagem extraída");
 
     // WhatsApp @lid: loga quando resolvemos (ou falhamos em resolver) o telefone
-    // real via remoteJidAlt/senderPn. unresolvedLid=true = mensagem SEM telefone
-    // válido — não há como responder, precisa investigar o payload cru.
-    if (incoming.wasLid) {
+    // real via remoteJidAlt/senderPn. Só importa para mensagens de ENTRADA reais
+    // (texto do paciente) — eventos messages.update (ack de entrega/leitura) e
+    // fromMe=true (eco de mensagem que O BOT mandou) sempre vêm sem remoteJidAlt
+    // preenchido e NÃO representam perda real, então não devem virar alarme.
+    const isRealIncomingLid =
+      incoming.wasLid && incoming.isMessageEvent && !incoming.fromMe && !incoming.isGroup;
+    if (isRealIncomingLid) {
       if (incoming.unresolvedLid) {
         logger.error({
           instanceName: incoming.instanceName,
